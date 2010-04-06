@@ -1,0 +1,39 @@
+# C ignores
+*.[oa]
+*~
+src/cdmifs
+
+src/.deps/
+
+# The actual Makefiles produced
+Makefile
+Makefile.in
+
+# The local aclocal.m4 file
+aclocal.m4
+
+# The output of the configure script
+config.h
+config.guess
+config.log
+config.status
+config.sub
+config.h.in
+
+# The configure script itself
+configure
+
+# The include directory artifacts
+include/config.h
+include/stamp-h1
+stamp-h1
+
+# Various scripts used for libtool and the like
+install-sh
+libtool
+ltmain.sh
+missing
+depcomp
+
+# Not sure what this one is for
+autom4te.cache/*
