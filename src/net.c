@@ -12,40 +12,48 @@
 #include <curl/curl.h>
 
 #include "util.h"
+#include "common.h"
 
 #define INITIAL_SIZE 4096
 
-struct buffer 
-{ 
-	char *data; 
-	size_t size; 
-	size_t pos; 
-}; 
- 
-static size_t write2buffer( void *ptr, size_t size, size_t nmemb, void *data ); 
- 
-char *download( const char *url ) 
-{ 
+struct buffer
+{
+	char *data;
+	size_t size;
+	size_t pos;
+};
+
+static size_t write2buffer( void *ptr, size_t size, size_t nmemb, void *data );
+
+char *download( CURL *curl ) 
+{
 	static struct buffer block; 
-	static CURL *curl_handle = NULL; 
- 
-	if( curl_handle == NULL ) 
-	{ 
-		curl_handle = curl_easy_init(); 
-		curl_easy_setopt( curl_handle, CURLOPT_WRITEFUNCTION, write2buffer ); 
-	} 
- 
  
 	block.pos = 0; 
  
-	curl_easy_setopt( curl_handle, CURLOPT_WRITEDATA, (void *)&block ); 
+	curl_easy_setopt( curl, CURLOPT_USERAGENT, USERAGENT ); 
+	curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, write2buffer ); 
+	curl_easy_setopt( curl, CURLOPT_WRITEDATA, (void *)&block ); 
+ 
+	curl_easy_perform( curl); 
+ 
+	return block.data; 
+}
+ 
+char *simple( const char *url ) 
+{ 
+	static CURL *curl_handle = NULL; 
+ 
+	if( curl_handle == NULL ) 
+		curl_handle = curl_easy_init(); 
+ 
 	curl_easy_setopt( curl_handle, CURLOPT_URL, url ); 
  
-	curl_easy_perform( curl_handle ); 
+	char *data = download( curl_handle );
  
 	/* yea, I know I need to clean the curl_handle, not gonna! */ 
  
-	return block.data; 
+	return data; 
 } 
  
 static size_t write2buffer( void *ptr, size_t size, size_t nmemb, void *data ) 
@@ -79,10 +87,10 @@ int main( int argc, char *argv[] )
 { 
 	int i; 
 	char first[512]; 
-	strcpy(first, download( URL ) ); 
+	strcpy(first, simple( URL ) ); 
 	for( i = 0; i < 100000; i++ ) 
 	{
-		if( strcmp( first, download( URL ) ) != 0 ) 
+		if( strcmp( first, simple( URL ) ) != 0 ) 
 		{ 
 			fprintf( stderr, "Failed at #%d!\n", i ); 
 			break; 

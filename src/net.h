@@ -4,8 +4,12 @@
  */
 #ifndef NET_H 
 #define NET_H 1 
+
+#include <curl/curl.h>
  
-extern char *download( const char *url ) ;
+extern char *download( CURL *curl );
+extern char *simple( const char *url ); 
+extern char *request( const char *url, char **headers, char *data ); 
  
 #endif /* !NET_H */ 
-
+ 

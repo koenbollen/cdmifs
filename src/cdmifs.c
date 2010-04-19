@@ -70,22 +70,23 @@ static void *cdmifs_init(void)
 		fprintf( stderr, "error: invalid uri: %s\n", options.uri );
 		exit(1);
 	}
+	DEBUG( "cdmifs %s\n", APP_VERSION );
 	DEBUG( "Debug information:%d\n", 0 );
 	DEBUG( " uri : %s\n", options.uri );
 	DEBUG( " host: %s\n", options.host );
 	DEBUG( " port: %s\n", options.port );
 	DEBUG( " root: %s\n", options.root );
 
+	curl_global_init( CURL_GLOBAL_ALL );
+
 	return NULL;
 }
 
 
-int main( int argc, char *argv[] )
+int main( int argc, char *argv[] ) 
 {
-	int ret;
+	int ret; 
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv); 
- 
-	printf( "cdmifs\n" );
  
 	memset(&options, 0, sizeof(struct options)); 
  
@@ -133,7 +134,7 @@ static int parse_uri()
 	if( (c=strchr(options.host, ':')) ) 
 	{ 
 		*c = 0; 
-		if( strlen(c+1) > 0 )
+		if( strlen(c+1) > 0 ) 
 			options.port = c+1; 
 	}
 	if( !options.port )

@@ -36,7 +36,9 @@ struct options
 extern struct options options; 
  
 #define DEFAULT_PORT "2364" 
+
+#define CDMI_SPEC_VERSION "1.0"
  
-#define DEBUG(format, args...) do { if(options.debug) fprintf( stderr, format, args ); } while(0)
+#define DEBUG(format, args...) do { if(options.debug) fprintf( stderr, format, args ); } while(0) 
  
 #endif /* ! COMMON_H */ 

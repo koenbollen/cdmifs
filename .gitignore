@@ -2,6 +2,7 @@
 *.[oa]
 *~
 src/cdmifs
+test_*
 
 src/.deps/
 
