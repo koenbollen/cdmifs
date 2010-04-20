@@ -1,23 +1,27 @@
-
-#include "directory.h" 
+/* cdmifs, a filesystem interface based on the CDMI standard.
+ * Koen Bollen <meneer koenbollen nl>
+ * 2010 Sara
+ */
+#include "directory.h"
 
 #include "../common.h"
-#include "../cdmi.h" 
+#include "../cdmi.h"
+#include "../net.h"
 
-#include <curl/curl.h> 
-#include <errno.h> 
+#include <curl/curl.h>
+#include <errno.h>
 #include <fcntl.h>
-#include <jansson.h> 
-#include <net.h> 
-#include <stdio.h> 
+#include <jansson.h>
+#include <net.h>
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h> 
-#include <unistd.h> 
- 
-int cdmifs_readdir( 
-		const char *path, 
-		void *buf, 
-		fuse_fill_dir_t filler, 
+#include <string.h>
+#include <unistd.h>
+
+int cdmifs_readdir(
+		const char *path,
+		void *buf,
+		fuse_fill_dir_t filler,
 		off_t offset, 
 		struct fuse_file_info *fi ) 
 { 
@@ -30,14 +34,51 @@ int cdmifs_readdir(
 	} 
  
 	int i; 
-	char url[512]; 
+	const char *cp; 
+	char childbuf[PATH_MAX]; 
+	json_t *children; 
+ 
+	i = getchildren( curl, path, &children ); 
+	if( i < 0 || !children ) 
+		return i; 
+ 
+	filler(buf, ".", NULL, 0); 
+	filler(buf, "..", NULL, 0); 
+	for(i = 0; i < json_array_size(children); i++) 
+	{ 
+		if( json_is_string( json_array_get(children, i) ) ) 
+		{ 
+			cp = json_string_value(json_array_get(children, i)); 
+			if( cp[strlen(cp)-1] == '/' ) 
+			{ 
+ 				strcpy( childbuf, cp ); 
+				childbuf[strlen(cp)-1] = 0; 
+				filler( buf, childbuf, NULL, 0 ); 
+			}
+			else
+				filler( buf, cp, NULL, 0 ); 
+		} 
+	} 
+ 
+	json_decref( children ); 
+ 
+	return 0; 
+} 
+ 
+int getchildren( CURL *curl, const char *path, json_t **result ) 
+{ 
+	char url[URLSIZE+1]; 
 	CURLcode res; 
 	json_t *root, *children; 
 	json_error_t error; 
+
+	*result = NULL; 
  
 	/* TODO: Fix the 1000 limit. */ 
-	snprintf( url, 511, "%s?children:0-1000", path2url( path ) ); 
+	snprintf( url, URLSIZE, "%s?children:0-1000", path2url( path ) ); 
 	res = curl_easy_setopt(curl, CURLOPT_URL, url ); 
+
+	/* TODO: Check res and response_code */ 
  
 	char *data = download( curl ); 
 	if( ! data ) 
@@ -46,28 +87,19 @@ int cdmifs_readdir(
 	root = json_loads( data , &error); 
 	if( !root ) 
 	{ 
-		fprintf( stderr, "error: json error on line %d: %s\n", error.line, error.text ); 
+		DEBUGV( "error: json error on line %d: %s\n", error.line, error.text ); 
 		return -EPROTO; 
 	} 
 	children = json_object_get( root, "children" ); 
 	if( !children ) 
 	{ 
-		fprintf( stderr, "error: invalid json response\n" ); 
+		DEBUG( "error: invalid json response\n" ); 
+		json_decref( root ); 
 		return -ENOTDIR; 
 	} 
  
-	filler(buf, ".", NULL, 0); 
-	filler(buf, "..", NULL, 0); 
-	for(i = 0; i < json_array_size(children); i++) 
-	{ 
-		if( json_is_string( json_array_get(children, i) ) ) 
-		{ 
-			filler( buf, json_string_value(json_array_get(children, i)), NULL, 0 );
-		} 
-	} 
- 
-	json_decref( root ); 
+	*result = children;
  
 	return 0; 
 } 
- 
+

@@ -9,7 +9,7 @@ mount: all
 	-fusermount -q -u ${MOUNT_POINT} 
 	./src/cdmifs -s ${CDMI_URI} ${MOUNT_POINT} 
  
-umount: all 
+umount: 
 	fusermount -u ${MOUNT_POINT} 
 	@rmdir ${MOUNT_POINT} 
  

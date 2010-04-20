@@ -70,12 +70,12 @@ static void *cdmifs_init(void)
 		fprintf( stderr, "error: invalid uri: %s\n", options.uri );
 		exit(1);
 	}
-	DEBUG( "cdmifs %s\n", APP_VERSION );
-	DEBUG( "Debug information:%d\n", 0 );
-	DEBUG( " uri : %s\n", options.uri );
-	DEBUG( " host: %s\n", options.host );
-	DEBUG( " port: %s\n", options.port );
-	DEBUG( " root: %s\n", options.root );
+	DEBUGV( "cdmifs %s\n", APP_VERSION );
+	DEBUG( "Debug information:\n" );
+	DEBUGV( " uri : %s\n", options.uri );
+	DEBUGV( " host: %s\n", options.host );
+	DEBUGV( " port: %s\n", options.port );
+	DEBUGV( " root: %s\n", options.root );
 
 	curl_global_init( CURL_GLOBAL_ALL );
 
@@ -130,6 +130,8 @@ static int parse_uri()
 		options.root = strdup(c); 
 	else 
 		options.root = "/"; 
+	if( options.root[1] != 0 && options.root[strlen(options.root)-1] == '/' )
+		options.root[strlen(options.root)-1] = 0;
 	options.host = strndup(uri, c-uri); 
 	if( (c=strchr(options.host, ':')) ) 
 	{ 

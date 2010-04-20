@@ -6,6 +6,7 @@
 # include <config.h>
 #endif
 
+#include <errno.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,20 +26,30 @@ struct buffer
 
 static size_t write2buffer( void *ptr, size_t size, size_t nmemb, void *data );
 
-char *download( CURL *curl ) 
+char *download( CURL *curl )
 {
-	static struct buffer block; 
- 
-	block.pos = 0; 
- 
-	curl_easy_setopt( curl, CURLOPT_USERAGENT, USERAGENT ); 
-	curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, write2buffer ); 
+	static struct buffer block;
+	CURLcode res;
+
+	block.pos = 0;
+
+	curl_easy_setopt( curl, CURLOPT_USERAGENT, USERAGENT );
 	curl_easy_setopt( curl, CURLOPT_WRITEDATA, (void *)&block ); 
+	curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, write2buffer );
  
-	curl_easy_perform( curl); 
+	res = curl_easy_perform( curl); 
+	if( res != CURLE_OK ) 
+	{ 
+		long err; 
+		curl_easy_getinfo( curl, CURLINFO_OS_ERRNO, &err ); 
+		errno = err; 
+		return NULL; 
+	} 
+ 
+	block.data[block.pos] = 0; 
  
 	return block.data; 
-}
+} 
  
 char *simple( const char *url ) 
 { 
@@ -49,19 +60,20 @@ char *simple( const char *url )
  
 	curl_easy_setopt( curl_handle, CURLOPT_URL, url ); 
  
-	char *data = download( curl_handle );
+	char *data = download( curl_handle ); 
  
 	/* yea, I know I need to clean the curl_handle, not gonna! */ 
  
 	return data; 
 } 
  
-static size_t write2buffer( void *ptr, size_t size, size_t nmemb, void *data ) 
+static size_t write2buffer( void *ptr, size_t size, size_t nmemb, void *stream ) 
 { 
 	size_t length = size * nmemb; 
-	struct buffer *buf = (struct buffer *)data; 
+	struct buffer *buf = (struct buffer *)stream; 
+	//fprintf( stderr, "pos: %d\nsiz: %d\nlen: %d\n", buf->pos, buf->size, length ); 
 	if( buf->pos + length + 1 > buf->size ) 
-	{
+	{ 
 		buf->size = buf->pos + length + 1; 
 		buf->data = alloc(buf->data, buf->size ); 
 	} 
@@ -69,9 +81,8 @@ static size_t write2buffer( void *ptr, size_t size, size_t nmemb, void *data )
 	{ 
 		memcpy( buf->data+buf->pos, ptr, length ); 
 		buf->pos += length; 
-		buf->data[buf->pos] = 0; 
 	} 
-	return size; 
+	return length; 
 } 
  
 #ifdef TEST_NET_C 
@@ -86,11 +97,11 @@ static size_t write2buffer( void *ptr, size_t size, size_t nmemb, void *data )
 int main( int argc, char *argv[] ) 
 { 
 	int i; 
-	char first[512]; 
-	strcpy(first, simple( URL ) ); 
-	for( i = 0; i < 100000; i++ ) 
+	char first[512];
+	strncmp(first, simple( URL ), 511 ); 
+	for( i = 0; i < 0; i++ ) 
 	{
-		if( strcmp( first, simple( URL ) ) != 0 ) 
+		if( strncmp( first, simple( URL ), 511 ) != 0 ) 
 		{ 
 			fprintf( stderr, "Failed at #%d!\n", i ); 
 			break; 
