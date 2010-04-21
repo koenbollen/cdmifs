@@ -58,10 +58,10 @@ int cdmifs_getattr(
 	if( !data )
 		return -EIO;
 
+	errno = 0;
 	res = curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &code );
 	if( res != CURLE_OK )
-		return -EIO;
-
+		return errno == 0 ? -EIO : -errno;
 	code = response_code2errno( code );
 	if( code != SUCCESS )
 		return -code;
@@ -83,36 +83,36 @@ int cdmifs_getattr(
 		return -EPROTO;
 	}
 	if( !json_is_string(json_object_get(root, "objectID")) )
-	{
+	{ 
 		DEBUG( "error: invalid json object\n" );
 		return -EPROTO;
-	}
+	} 
 
-	if( parse_metadata( json_object_get(root, "metadata"), stbuf ) < 0 )
-	{
+	if( parse_metadata( json_object_get(root, "metadata"), stbuf ) < 0 ) 
+	{ 
 		DEBUG( "error: unable to parse metadata\n" );
-		return -EPROTO;
-	}
+		return -EPROTO; 
+	} 
 
-	json_decref( root );
-
-	if( S_ISDIR( stbuf->st_mode ) )
-	{
+	json_decref( root ); 
+ 
+	if( S_ISDIR( stbuf->st_mode ) ) 
+	{ 
 		stbuf->st_mode |= 0755;
-		ret = getchildren( curl, path, &root );
-		if( ret < 0 )
+		ret = getchildren( curl, path, &root ); 
+		if( ret < 0 ) 
 			return ret;
 
-		stbuf->st_nlink = 2;
+		stbuf->st_nlink = 2; 
 		for(i = 0; i < json_array_size(root); i++)
-		{
+		{ 
 			if( json_is_string( json_array_get(root, i) ) )
-			{
-				const char *cp = json_string_value(json_array_get(root, i));
+			{ 
+				const char *cp = json_string_value(json_array_get(root, i)); 
 				if( cp[strlen(cp)-1] == '/' )
-					(stbuf->st_nlink)++;
-			}
-		}
+					(stbuf->st_nlink)++; 
+			} 
+		} 
  
 		json_decref( root ); 
  

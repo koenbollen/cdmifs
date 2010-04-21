@@ -32,14 +32,12 @@ struct curl_slist *slist_append( struct curl_slist * list, const char * format, 
 }
 
 time_t iso8601_decode( const char *isoformat )
-{
-	tzset(); 
- 
+{ 
 	struct tm td; 
-	memset(&td, 0, sizeof(struct tm));
-	strptime(isoformat, "%FT%T%z", &td); 
+	memset( &td, 0, sizeof(struct tm) );
+	strptime( isoformat, "%FT%T", &td ); 
  
-	return mktime(&td) - timezone; 
+	return mktime( &td ); 
 } 
  
 void *alloc( void *ptr, size_t size ) 

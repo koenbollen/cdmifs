@@ -10,7 +10,7 @@
 #define M_DATAOBJECT 2 
 #define M_CONTAINER  3 
 
-char *mime[] = { 
+static char *mime[] = { 
 	"text/json", 
 	"application/vnd.org.snia.cdmi.object+json", 
 	"application/vnd.org.snia.cdmi.dataobject+json", 

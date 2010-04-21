@@ -83,6 +83,15 @@ int getchildren( CURL *curl, const char *path, json_t **result )
 	char *data = download( curl ); 
 	if( ! data ) 
 		return -EIO; 
+
+	long code;
+	errno = 0;
+	res = curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &code );
+	if( res != CURLE_OK )
+		return errno == 0 ? -EIO : -errno;
+	code = response_code2errno( code );
+	if( code != SUCCESS )
+		return -code;
  
 	root = json_loads( data , &error); 
 	if( !root ) 
