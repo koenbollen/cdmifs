@@ -1,4 +1,7 @@
-
+/* cdmifs, a filesystem interface based on the CDMI standard.
+ * Koen Bollen <meneer koenbollen nl>
+ * 2010 GPL
+ */
 #include "control.h" 
  
 #include "../cdmi.h" 

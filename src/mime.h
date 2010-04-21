@@ -1,6 +1,6 @@
-/* cdmifs, a filesystem interface based on the cdmi standard. 
- * koen bollen <meneer koenbollen nl> 
- * 2010 sara
+/* cdmifs, a filesystem interface based on the CDMI standard. 
+ * Koen Bollen <meneer koenbollen nl> 
+ * 2010 GPL
  */ 
 #ifndef MIME_H 
 #define MIME_H

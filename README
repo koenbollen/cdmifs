@@ -1,3 +1,52 @@
-cdmifs, a filesystem interface based on the CDMI standard.
-Koen Bollen <meneer koenbollen nl>
-2010 Sara
+cdmifs, FUSE based file system using the CDMI standard.
+
+
+== About ==
+
+CDMI is a data management interface for cloud storage (see
+http://cdmi.sniacloud.com/ for more information). This project aims to
+transparently use this protocol to mount a container.
+
+ -- Koen Bollen <meneer koenbollen nl> 
+
+
+
+== Quickstart ==
+
+To quickly install the cdmifs filesystem execute the following commands:
+
+Download the source:
+ $ git clone git://github.com/koenbollen/cdmifs.git
+ $ cd cdmifs
+
+Configure:
+ $ autoreconf -i
+ $ ./configure
+
+Compile and install:
+ $ make 
+ $ sudo make install
+
+Mount:
+ $ cdmifs cdmi://example.com/root/path /mnt/data
+
+
+
+== License ==
+
+A FUSE based file system using the CDMI standard.
+Copyright (C) 2010 Koen Bollen
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
