@@ -7,7 +7,6 @@
 
 #include <sys/types.h>
 #include <curl/curl.h>
-#include <jansson.h>
 #include "../common.h" 
  
 extern int cdmifs_readdir( 
@@ -17,8 +16,6 @@ extern int cdmifs_readdir(
 		off_t offset, 
 		struct fuse_file_info *fi 
 	); 
-
-extern int getchildren( CURL *curl, const char *path, json_t **result );
 
 #endif /* !DIRECTORY_H */ 
 

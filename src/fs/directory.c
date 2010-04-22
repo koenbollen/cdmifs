@@ -25,22 +25,14 @@ int cdmifs_readdir(
 		off_t offset, 
 		struct fuse_file_info *fi ) 
 { 
-	static CURL *curl = NULL; 
-	if( curl == NULL ) 
-	{ 
-		curl = curl_easy_init(); 
-		if( options.debug ) 
-			curl_easy_setopt( curl, CURLOPT_VERBOSE, 1L ); 
-	} 
- 
 	int i; 
 	const char *cp; 
 	char childbuf[PATH_MAX]; 
 	json_t *children; 
- 
-	i = getchildren( curl, path, &children ); 
-	if( i < 0 || !children ) 
-		return i; 
+
+	children = cdmi_request( path, (char*[]){"children",NULL}, CDMI_SINGLE );
+	if( children == NULL || !json_is_array( children ) )
+		return errno == 0 ? -1 : -errno; 
  
 	filler(buf, ".", NULL, 0); 
 	filler(buf, "..", NULL, 0); 
@@ -65,50 +57,3 @@ int cdmifs_readdir(
 	return 0; 
 } 
  
-int getchildren( CURL *curl, const char *path, json_t **result ) 
-{ 
-	char url[URLSIZE+1]; 
-	CURLcode res; 
-	json_t *root, *children; 
-	json_error_t error; 
-
-	*result = NULL; 
- 
-	/* TODO: Fix the 1000 limit. */ 
-	snprintf( url, URLSIZE, "%s?children:0-1000", path2url( path ) ); 
-	res = curl_easy_setopt(curl, CURLOPT_URL, url ); 
-
-	/* TODO: Check res and response_code */ 
- 
-	char *data = download( curl ); 
-	if( ! data ) 
-		return -EIO; 
-
-	long code;
-	errno = 0;
-	res = curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &code );
-	if( res != CURLE_OK )
-		return errno == 0 ? -EIO : -errno;
-	code = response_code2errno( code );
-	if( code != SUCCESS )
-		return -code;
- 
-	root = json_loads( data , &error); 
-	if( !root ) 
-	{ 
-		DEBUGV( "error: json error on line %d: %s\n", error.line, error.text ); 
-		return -EPROTO; 
-	} 
-	children = json_object_get( root, "children" ); 
-	if( !children ) 
-	{ 
-		DEBUG( "error: invalid json response\n" ); 
-		json_decref( root ); 
-		return -ENOTDIR; 
-	} 
- 
-	*result = children;
- 
-	return 0; 
-} 
-

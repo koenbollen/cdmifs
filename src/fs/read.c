@@ -26,52 +26,13 @@ int cdmifs_read(
 		struct fuse_file_info *fi ) 
 { 
  
-	static CURL *curl = NULL; 
-	if( curl == NULL ) 
-	{ 
-		curl = curl_easy_init(); 
-		if( options.debug ) 
-			curl_easy_setopt( curl, CURLOPT_VERBOSE, 1L ); 
-	} 
+	json_t *root;
+	int ret, start, end;
+	char valuefield[32];
+
+	sprintf( valuefield, "value:%d-%d", (int)offset, (int)offset+size );
+	root = cdmi_request( path, (char*[]){"valuerange", valuefield, NULL}, CDMI_DATAOBJECT | CDMI_CHECK );
  
-	CURLcode res; 
-	int ret; 
-	char url[URLSIZE+1]; 
-	char *data, *ct; 
-	long code; 
-	json_t *root; 
-	json_error_t error;
- 
-	snprintf( url, URLSIZE, "%s?value:%d-%d;valuerange", path2url( path ), (int)offset, (int)offset+size ); 
-	curl_easy_setopt(curl, CURLOPT_URL, url ); 
- 
-	data = download( curl ); 
-	if( !data ) 
-		return -EIO; 
- 
-	errno = 0; 
-	res = curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &code ); 
-	if( res != CURLE_OK ) 
-		return errno == 0 ? -EIO : -errno; 
-	code = response_code2errno( code ); 
-	if( code != SUCCESS ) 
-		return -code; 
- 
-	res = curl_easy_getinfo( curl, CURLINFO_CONTENT_TYPE, &ct ); 
-	if( res != CURLE_OK ) 
-		return -EIO; 
- 
-	if( strcmp( ct, mime[M_JSON] ) != 0 ) 
-		return -EPROTO; 
- 
-	root = json_loads( data, &error ); 
-	if( !root )
-	{ 
-		DEBUGV( "error: json error on line %d: %s\n", error.line, error.text ); 
-		return -EPROTO; 
-	} 
- 
-	int start=0, end=0;
 	ret = sscanf( json_string_value( json_object_get(root,"valuerange") ), "%u-%u", &start, &end ); 
 	if( ret != 2 )
 	{ 

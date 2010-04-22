@@ -27,70 +27,27 @@ int cdmifs_getattr(
 		const char *path,
 		struct stat *stbuf )
 {
-	static CURL *curl = NULL;
-	if( curl == NULL )
-	{
-		struct curl_slist *chunk = NULL;
-
-		curl = curl_easy_init();
-		if( options.debug )
-			curl_easy_setopt( curl, CURLOPT_VERBOSE, 1L );
-
-		chunk = slist_append( chunk, "X-CDMI-Specification-Version: %s", CDMI_SPEC_VERSION );
-		chunk = slist_append( chunk, "Accept: %s", mime[M_OBJECT] );
-		chunk = slist_append( chunk, "Content-Type: %s", mime[M_OBJECT] );
-		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, chunk );
-	}
-
-	CURLcode res;
-	int i, ret;
-	long code;
-	char *data, *ct, url[URLSIZE+1];
+	int i;
 	json_t *root;
-	json_error_t error;
 
-	memset( stbuf, 0, sizeof(struct stat) );
-
-	snprintf( url, URLSIZE, "%s?objectID;metadata", path2url( path ) );
-	curl_easy_setopt(curl, CURLOPT_URL, url );
-
-	data = download( curl );
-	if( !data )
-		return -EIO;
-
-	errno = 0;
-	res = curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &code );
-	if( res != CURLE_OK )
+	root = cdmi_request( path, (char*[]){ "objectID", "metadata", NULL }, CDMI_CHECK | CDMI_CONTENTTYPE );
+	if( root == NULL )
 		return errno == 0 ? -EIO : -errno;
-	code = response_code2errno( code );
-	if( code != SUCCESS )
-		return -code;
 
-	res = curl_easy_getinfo( curl, CURLINFO_CONTENT_TYPE, &ct );
-	if( res != CURLE_OK )
-		return -EIO;
-	if( strcmp( ct, mime[M_CONTAINER] ) == 0 )
+	if( strcmp( json_string_value( json_object_get( root, "_contenttype" ) ), mime[M_CONTAINER] ) == 0 )
 		stbuf->st_mode = S_IFDIR;
-	else if( strcmp( ct, mime[M_DATAOBJECT] ) == 0 )
+	else if( strcmp( json_string_value( json_object_get( root, "_contenttype" ) ), mime[M_DATAOBJECT] ) == 0 )
 		stbuf->st_mode = S_IFREG;
 	else
-		return -EPROTO;
-
-	root = json_loads( data, &error );
-	if( !root )
 	{
-		DEBUGV( "error: json error on line %d: %s\n", error.line, error.text );
+		json_decref( root );
 		return -EPROTO;
 	}
-	if( !json_is_string(json_object_get(root, "objectID")) )
-	{ 
-		DEBUG( "error: invalid json object\n" );
-		return -EPROTO;
-	} 
 
 	if( parse_metadata( json_object_get(root, "metadata"), stbuf ) < 0 ) 
 	{ 
 		DEBUG( "error: unable to parse metadata\n" );
+		json_decref( root );
 		return -EPROTO; 
 	} 
 
@@ -99,9 +56,9 @@ int cdmifs_getattr(
 	if( S_ISDIR( stbuf->st_mode ) ) 
 	{ 
 		stbuf->st_mode |= 0755;
-		ret = getchildren( curl, path, &root ); 
-		if( ret < 0 ) 
-			return ret;
+		root = cdmi_request( path, (char*[]){"children",NULL}, CDMI_SINGLE );
+		if( root == NULL ) 
+			return errno == 0 ? -EIO : -errno;
 
 		stbuf->st_nlink = 2; 
 		for(i = 0; i < json_array_size(root); i++)

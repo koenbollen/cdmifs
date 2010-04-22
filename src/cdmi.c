@@ -161,6 +161,11 @@ json_t *cdmi_request( const char *path, char **fields, int flags )
 		} 
 	}
 
+	if( (flags & CDMI_CONTENTTYPE) == CDMI_CONTENTTYPE && json_is_object(root) )
+	{
+		json_object_set( root, "_contenttype", json_string( cp ) );
+	}
+
 	if( (flags & CDMI_CHECK) == CDMI_CHECK )
 	{
 		if( !json_is_object( root ) )

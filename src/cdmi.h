@@ -14,13 +14,14 @@
 
 
 
-#define CDMI_NONCDMI    (1<<0)
+#define CDMI_NONCDMI     (1<<0)
 
-#define CDMI_CONTAINER  (1<<1)
-#define CDMI_DATAOBJECT (1<<2)
+#define CDMI_CONTAINER   (1<<1)
+#define CDMI_DATAOBJECT  (1<<2)
 
-#define CDMI_SINGLE     (1<<3)
-#define CDMI_CHECK      (1<<4)
+#define CDMI_SINGLE      (1<<3)
+#define CDMI_CHECK       (1<<4)
+#define CDMI_CONTENTTYPE (1<<5)
 
 
  
