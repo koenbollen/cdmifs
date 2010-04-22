@@ -32,6 +32,7 @@ struct options
 	int ssl; 
 	char *root; 
 	int debug; 
+	int curl_debug; 
 }; 
 extern struct options options; 
  

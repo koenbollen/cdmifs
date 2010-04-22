@@ -10,12 +10,23 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef _XOPEN_SOURCE
+# define _XOPEN_SOURCE
+#endif
 #include <time.h>
+
 
 static const char b64table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 static inline char isbase64( char c );
 static inline char b64value( char c );
+
+void *errnull( int err ) 
+{
+	errno = err;
+	return NULL;
+}
 
 struct curl_slist *slist_append( struct curl_slist * list, const char * format, ... )
 {
@@ -29,6 +40,37 @@ struct curl_slist *slist_append( struct curl_slist * list, const char * format, 
 	va_end(ap);
 	res = curl_slist_append( list, buf );
 	return res;
+}
+
+struct curl_slist *slist_replace( struct curl_slist * list, const char *format, ... )
+{
+	size_t size = strlen(format)+512;
+	char buf[size], *cp;
+	struct curl_slist *item;
+	va_list ap;
+	int colon;
+
+	va_start(ap, format);
+	vsnprintf( buf, size, format, ap );
+	va_end(ap);
+
+	// Find the : char
+	cp = index( buf, ':' );
+	if( !cp ) return list;
+	colon = (int)(cp-buf);
+
+	for( item = list; item; item = item->next )
+	{
+		if( strncmp( item->data, buf, colon ) == 0 )
+		{
+			free(item->data);
+			item->data = strdup( buf );
+			return list;
+		}
+	}
+
+	// append if not found:
+	return curl_slist_append( list, buf );
 }
 
 time_t iso8601_decode( const char *isoformat )

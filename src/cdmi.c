@@ -5,20 +5,210 @@
 #include "cdmi.h"
 #include "common.h"
  
+#include "mime.h" 
+#include "net.h" 
 #include "util.h" 
  
-#include <assert.h> 
-#include <errno.h> 
-#include <stdio.h> 
-#include <string.h> 
 #include <arpa/inet.h> 
- 
+#include <assert.h> 
+#include <curl/curl.h> 
+#include <errno.h> 
+#include <jansson.h> 
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <string.h> 
+
+json_t *cdmi_request( const char *path, char **fields, int flags )
+{
+	static CURL *curl = NULL;
+	static struct curl_slist *headers = NULL;
+	static int cdmitype = 0;
+
+	CURLcode res;
+	char *cp, **cpp;
+	char *url, *data;
+	size_t urlsize;
+	long code;
+	json_t *root;
+	json_error_t jsonerr;
+
+
+	/* Setup curl object and the header.
+	 */
+	if( curl == NULL )
+	{
+		curl = curl_easy_init();
+		if( options.curl_debug )
+			curl_easy_setopt( curl, CURLOPT_VERBOSE, 1L );
+
+		headers = slist_append( 
+				headers, 
+				"X-CDMI-Specification-Version: %s", CDMI_SPEC_VERSION );
+		headers = slist_append( headers, "Accept: %s", mime[M_OBJECT] );
+		headers = slist_append( headers, "Content-Type: %s", mime[M_OBJECT] );
+	}
+
+
+	/* See what kind of object is requested and set the
+	 * appropriate Accept: header and cdmitype.
+	 */
+	if( (flags & CDMI_CONTAINER) == CDMI_CONTAINER )
+	{
+		if( cdmitype != CDMI_CONTAINER )
+		{
+			headers = slist_replace( headers, "Accept: %s", mime[M_CONTAINER] );
+			cdmitype = CDMI_CONTAINER;
+		}
+	}
+	else if( (flags & CDMI_DATAOBJECT) == CDMI_DATAOBJECT )
+	{
+		if( cdmitype != CDMI_DATAOBJECT )
+		{
+			headers = slist_replace( headers, "Accept: %s", mime[M_DATAOBJECT] );
+			cdmitype = CDMI_DATAOBJECT;
+		}
+	}
+	else if( cdmitype != 0 )
+	{
+		headers = slist_replace( headers, "Accept: %s", mime[M_OBJECT] );
+		cdmitype = 0;
+	}
+
+
+	/* Place heaaders on the curl object if a cdmi request is
+	 * not noncdmi.
+	 */
+	if( (flags & CDMI_NONCDMI) == CDMI_NONCDMI )
+		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, NULL );
+	else
+		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, headers );
+
+
+	/* Build the url from the path and append the field
+	 * to it.
+	 */
+	url = path2url( path );
+	urlsize = strlen( url ) + 1;
+	if( fields != NULL )
+		for( cpp = fields, cp = *cpp; *cpp; cpp++, cp = *cpp )
+			urlsize += strlen( cp ) + 1;
+
+	url = strdup( url );
+
+	if( fields != NULL )
+	{
+		url = realloc( url, urlsize );
+		if( url == NULL )
+			return NULL;
+		for( cpp = fields, cp = *cpp; *cpp; cpp++, cp = *cpp )
+		{
+			strcat( url, cpp == fields ? "?" : ";" );
+			strcat( url, cp );
+			if( (flags & CDMI_SINGLE) == CDMI_SINGLE )
+				break;
+		}
+	}
+
+
+	/* Set url to the curl object, download the data and
+	 * do error checks.
+	 */
+	DEBUGV( "info: cdmi_request %s\n", url );
+	curl_easy_setopt( curl, CURLOPT_URL, url ); 
+	free( url ); /* curl's setopt does a strdup. */
+
+	errno = 0;
+	data = download( curl );
+	if( !data ) 
+		return errnull( errno == 0 ? EIO : errno );
+	//puts( data );
+
+	errno = 0; 
+	res = curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &code ); 
+	if( res != CURLE_OK ) 
+		return errnull( EIO );
+	code = response_code2errno( code ); 
+	if( code != SUCCESS ) 
+		return errnull( code );
+
+	res = curl_easy_getinfo( curl, CURLINFO_CONTENT_TYPE, &cp ); 
+	if( res != CURLE_OK || cp == NULL ) 
+		return errnull( EPROTO );
+	if( (flags & CDMI_NONCDMI) != CDMI_NONCDMI )
+	{
+		if( cdmitype == CDMI_CONTAINER && strcmp( cp, mime[M_CONTAINER] ) != 0 )
+			return errnull( ENOTDIR );
+		else if( cdmitype == CDMI_DATAOBJECT
+				&& strcmp( cp, mime[M_DATAOBJECT] ) != 0 )
+			return errnull( EISDIR );
+	}
+
+	/* Load json data and check if it's correct, if CDMI_SINGLE is set
+	 * select the first item.
+	 */
+	if( (flags & CDMI_NONCDMI) == CDMI_NONCDMI && strcmp( cp, mime[M_JSON] ) != 0 )
+	{
+		root = json_object();
+		json_object_set( root, "value", json_string( data ) );
+	}
+	else
+	{
+		root = json_loads( data, &jsonerr ); 
+		if( root == NULL )
+		{ 
+			DEBUGV( "error: json error on line %d: %s\n", jsonerr.line, jsonerr.text ); 
+			return errnull( EPROTO );
+		} 
+	}
+
+	if( (flags & CDMI_CHECK) == CDMI_CHECK )
+	{
+		if( !json_is_object( root ) )
+		{
+			json_decref( root );
+			return errnull( EPROTO );
+		}
+		for( cpp = fields, cp = *cpp; *cpp; cpp++, cp = *cpp )
+		{
+			char *field = strdup( cp );
+			cp = index(field, ':' );
+			if( cp != NULL)
+				*cp = 0;
+			if( json_object_get( root, field ) == NULL )
+			{
+				free( field );
+				json_decref( root );
+				DEBUGV( "error: missing json element: %s\n", cp );
+				return errnull( EPROTO );
+			}
+			free( field );
+		}
+	}
+
+	/* Select the first fields.
+	 */
+	if( (flags & CDMI_SINGLE) == CDMI_SINGLE && ( fields != NULL || cdmitype == CDMI_DATAOBJECT ) )
+	{
+		if( json_is_object( root ) )
+		{
+			json_t *parent = root;
+			root = json_object_get( root, fields == NULL ? "value" : *fields );
+			if( root != NULL )
+				json_incref( root );
+			json_decref( parent );
+		}
+	}
+
+	return root;
+}
+
+
 char *path2url( const char *path ) 
 { 
-	static char url[512]; 
+	static char url[URLSIZE+1]; 
 	if( path[0] == '/' ) 
 		path++; 
-	sprintf( url, "%s://%s:%s%s/%s", 
+	snprintf( url, URLSIZE, "%s://%s:%s%s/%s", 
 			options.ssl?"https":"http", 
 			options.host, options.port, 
 			options.root, path 

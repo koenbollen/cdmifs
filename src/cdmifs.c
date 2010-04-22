@@ -49,6 +49,7 @@ enum
 static struct fuse_opt opts[] =
 {
 	OPT_KEY("cdmifs_debug", debug, 1),
+	OPT_KEY("curl_debug", curl_debug, 1),
 	OPT_KEY("ssl",          ssl, 1),
 
 	FUSE_OPT_KEY("-V",             KEY_VERSION),
