@@ -7,7 +7,11 @@
  
 #include <sys/types.h> 
 #include <curl/curl.h> 
+
+
+#define ISSET( flags, flag ) ((flags & flag) == flag)
  
+
 extern void *alloc( void *ptr, size_t size ) ; 
 
 /**

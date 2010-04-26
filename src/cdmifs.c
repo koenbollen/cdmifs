@@ -35,6 +35,7 @@ struct fuse_operations cdmifs_operations = {
 	 .init     = cdmifs_init,
 	 .getattr  = cdmifs_getattr,
 	 .readdir  = cdmifs_readdir,
+	 .mkdir    = cdmifs_mkdir,
 	 .open     = cdmifs_open,
 	 .read     = cdmifs_read,
 };
@@ -84,84 +85,84 @@ static void *cdmifs_init(void)
 }
 
 
-int main( int argc, char *argv[] ) 
+int main( int argc, char *argv[] )
 {
-	int ret; 
-	struct fuse_args args = FUSE_ARGS_INIT(argc, argv); 
- 
-	memset(&options, 0, sizeof(struct options)); 
- 
-	if( fuse_opt_parse(&args, &options, opts, cdmifs_opt_proc) == -1 ) 
-		return -1; 
- 
-	if( !options.uri ) 
-	{ 
-		fprintf( stderr, "error: no uri given\n" ); 
-		return 1; 
-	} 
- 
-	ret = fuse_main( args.argc, args.argv, &cdmifs_operations, NULL); 
- 
-	if( ret ) 
-		printf("\n"); 
- 
-	fuse_opt_free_args(&args); 
- 
-	return ret; 
-} 
- 
-/* 
- * Format: "[cdmi[s]://]host[:port][/root]" 
- */ 
-static int parse_uri() 
-{ 
-	char *c; 
-	char *uri = options.uri; 
-	if( strncmp( uri, "cdmi://", 7 ) == 0 ) 
-		uri += 7; 
-#ifdef USE_SSL 
-	else if( strncmp( uri, "cdmis://", 8 ) == 0 ) 
-	{ 
-		options.ssl = 1; 
-		uri += 8; 
-	} 
-#endif 
- 
-	if( (c=strchr(uri, '/')) ) 
-		options.root = strdup(c); 
-	else 
-		options.root = "/"; 
+	int ret;
+	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+
+	memset(&options, 0, sizeof(struct options));
+
+	if( fuse_opt_parse(&args, &options, opts, cdmifs_opt_proc) == -1 )
+		return -1;
+
+	if( !options.uri )
+	{
+		fprintf( stderr, "error: no uri given\n" );
+		return 1;
+	}
+
+	ret = fuse_main( args.argc, args.argv, &cdmifs_operations, NULL);
+
+	if( ret )
+		printf("\n");
+
+	fuse_opt_free_args(&args);
+
+	return ret;
+}
+
+/*
+ * Format: "[cdmi[s]://]host[:port][/root]"
+ */
+static int parse_uri()
+{
+	char *c;
+	char *uri = options.uri;
+	if( strncmp( uri, "cdmi://", 7 ) == 0 )
+		uri += 7;
+#ifdef USE_SSL
+	else if( strncmp( uri, "cdmis://", 8 ) == 0 )
+	{
+		options.ssl = 1;
+		uri += 8;
+	}
+#endif
+
+	if( (c=strchr(uri, '/')) )
+		options.root = strdup(c);
+	else
+		options.root = "/";
 	if( options.root[1] != 0 && options.root[strlen(options.root)-1] == '/' )
 		options.root[strlen(options.root)-1] = 0;
-	options.host = strndup(uri, c-uri); 
-	if( (c=strchr(options.host, ':')) ) 
-	{ 
-		*c = 0; 
-		if( strlen(c+1) > 0 ) 
-			options.port = c+1; 
+	options.host = strndup(uri, c-uri);
+	if( (c=strchr(options.host, ':')) )
+	{
+		*c = 0;
+		if( strlen(c+1) > 0 )
+			options.port = c+1;
 	}
 	if( !options.port )
-		options.port = DEFAULT_PORT; 
-	if( strlen(options.host) < 1 ) 
-		return 0; 
- 
-	return 1; 
-} 
- 
-static int cdmifs_opt_proc( void *data, const char *arg, int key, struct fuse_args *outargs ) 
-{ 
-	switch( key ) 
-	{ 
-		case FUSE_OPT_KEY_NONOPT: 
+		options.port = DEFAULT_PORT;
+	if( strlen(options.host) < 1 )
+		return 0;
+
+	return 1;
+}
+
+static int cdmifs_opt_proc( void *data, const char *arg, int key, struct fuse_args *outargs )
+{
+	switch( key )
+	{
+		case FUSE_OPT_KEY_NONOPT:
 			if( options.uri == NULL )
-			{ 
-				options.uri = strdup(arg); 
-				return 0; 
-			} 
-			return 1; 
-		default: 
-			return 1; 
-	} 
-} 
- 
+			{
+				options.uri = strdup(arg);
+				return 0;
+			}
+			return 1;
+		default:
+			return 1;
+	}
+}
+
 

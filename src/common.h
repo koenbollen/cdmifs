@@ -44,5 +44,5 @@ extern struct options options;
  
 #define DEBUG(msg) do { if(options.debug) fprintf( stderr, "%s", msg ); } while(0) 
 #define DEBUGV(format, args...) do { if(options.debug) fprintf( stderr, format, args ); } while(0) 
- 
+
 #endif /* ! COMMON_H */ 

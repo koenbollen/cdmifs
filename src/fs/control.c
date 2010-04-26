@@ -22,7 +22,7 @@ extern int cdmifs_open(
 		struct fuse_file_info *fi ) 
 { 
 	json_t *root;
-	root = cdmi_request( path, (char*[]){"objectID",NULL}, CDMI_DATAOBJECT | CDMI_CHECK );
+	root = cdmi_get( path, (char*[]){"objectID",NULL}, CDMI_DATAOBJECT | CDMI_CHECK );
 	if( root == NULL )
 		return errno == 0 ? -EIO : -errno; 
 

@@ -7,7 +7,6 @@
 #include "../common.h"
 #include "../cdmi.h"
 #include "../net.h"
-#include "../mime.h"
 
 #include <errno.h> 
 #include <fcntl.h> 
@@ -31,7 +30,7 @@ int cdmifs_read(
 	char valuefield[32];
 
 	sprintf( valuefield, "value:%d-%d", (int)offset, (int)offset+size );
-	root = cdmi_request( path, (char*[]){"valuerange", valuefield, NULL}, CDMI_DATAOBJECT | CDMI_CHECK );
+	root = cdmi_get( path, (char*[]){"valuerange", valuefield, NULL}, CDMI_DATAOBJECT | CDMI_CHECK );
  
 	ret = sscanf( json_string_value( json_object_get(root,"valuerange") ), "%u-%u", &start, &end ); 
 	if( ret != 2 )

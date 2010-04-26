@@ -17,5 +17,7 @@ extern int cdmifs_readdir(
 		struct fuse_file_info *fi 
 	); 
 
+extern int cdmifs_mkdir( const char *path, mode_t mode );
+
 #endif /* !DIRECTORY_H */ 
 

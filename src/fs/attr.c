@@ -30,7 +30,7 @@ int cdmifs_getattr(
 	int i;
 	json_t *root;
 
-	root = cdmi_request( path, (char*[]){ "objectID", "metadata", NULL }, CDMI_CHECK | CDMI_CONTENTTYPE );
+	root = cdmi_get( path, (char*[]){ "objectID", "metadata", NULL }, CDMI_CHECK | CDMI_CONTENTTYPE );
 	if( root == NULL )
 		return errno == 0 ? -EIO : -errno;
 
@@ -56,7 +56,7 @@ int cdmifs_getattr(
 	if( S_ISDIR( stbuf->st_mode ) ) 
 	{ 
 		stbuf->st_mode |= 0755;
-		root = cdmi_request( path, (char*[]){"children",NULL}, CDMI_SINGLE );
+		root = cdmi_get( path, (char*[]){"children",NULL}, CDMI_SINGLE );
 		if( root == NULL ) 
 			return errno == 0 ? -EIO : -errno;
 

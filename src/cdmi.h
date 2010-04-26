@@ -33,7 +33,9 @@ typedef struct _objectid
 	char data[32]; 
 } objectid_t; 
  
-extern json_t *cdmi_request( const char *path, char **fields, int flags );
+extern json_t *cdmi_get( const char *path, char **fields, int flags );
+extern int cdmi_put( const char *path, json_t *data, int flags );
+
 extern char *path2url( const char *path ); 
 extern int response_code2errno( long response_code ); 
 extern objectid_t objectid_decode( const char *b64data ); 
