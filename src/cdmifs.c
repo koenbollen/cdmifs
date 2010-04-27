@@ -21,6 +21,7 @@
 #include "fs/control.h"
 #include "fs/directory.h"
 #include "fs/read.h"
+#include "fs/write.h"
 
 static int parse_uri();
 static int cdmifs_opt_proc( void *data, const char *arg, int key, struct fuse_args *outargs );
@@ -37,7 +38,9 @@ struct fuse_operations cdmifs_operations = {
 	 .readdir  = cdmifs_readdir,
 	 .mkdir    = cdmifs_mkdir,
 	 .open     = cdmifs_open,
+	 .create   = cdmifs_create,
 	 .read     = cdmifs_read,
+	 .write    = cdmifs_write
 };
 
 struct options options;

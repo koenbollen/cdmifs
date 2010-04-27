@@ -52,6 +52,12 @@ char *download( CURL *curl )
 	static struct buffer block;
 	CURLcode res;
 
+	if( block.data == NULL )
+	{
+		block.size = 32;
+		block.data = alloc(block.data, block.size );
+	}
+
 	block.pos = 0;
 
 	curl_easy_setopt( curl, CURLOPT_WRITEDATA, (void *)&block );

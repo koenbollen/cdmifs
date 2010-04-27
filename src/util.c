@@ -16,16 +16,43 @@
 #endif
 #include <time.h>
 
+#include <magic.h>
+
+#ifndef MAGIC_FILE
+# define MAGIC_FILE NULL
+#endif
 
 static const char b64table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 static inline char isbase64( char c );
 static inline char b64value( char c );
 
-void *errnull( int err ) 
+void *errnull( int err )
 {
 	errno = err;
 	return NULL;
+}
+
+const char *mimetype( const void *buffer, size_t length )
+{
+	static magic_t handle = NULL;
+	if( handle == NULL )
+	{
+		int ret;
+		handle = magic_open( MAGIC_MIME_TYPE );
+		ret = magic_load( handle, MAGIC_FILE );
+		if( ret != 0 )
+		{
+			fprintf( stderr, "error: %s\n", magic_error( handle ) );
+			return MAGIC_DEFAULT;
+		}
+	}
+
+	const char *mime;
+	mime = magic_buffer( handle, buffer, length );
+	if( mime == NULL )
+		return MAGIC_DEFAULT;
+	return mime;
 }
 
 struct curl_slist *slist_append( struct curl_slist * list, const char * format, ... )
@@ -74,82 +101,82 @@ struct curl_slist *slist_replace( struct curl_slist * list, const char *format, 
 }
 
 time_t iso8601_decode( const char *isoformat )
-{ 
-	struct tm td; 
+{
+	struct tm td;
 	memset( &td, 0, sizeof(struct tm) );
-	strptime( isoformat, "%FT%T", &td ); 
- 
-	return mktime( &td ); 
-} 
- 
-void *alloc( void *ptr, size_t size ) 
-{ 
-	assert( size > 0 ); 
-	if( ptr ) 
-		return realloc( ptr, size ); 
-	return malloc( size ); 
-} 
- 
-size_t b64_size( size_t len ) 
-{ 
+	strptime( isoformat, "%FT%T", &td );
+
+	return mktime( &td );
+}
+
+void *alloc( void *ptr, size_t size )
+{
+	assert( size > 0 );
+	if( ptr )
+		return realloc( ptr, size );
+	return malloc( size );
+}
+
+size_t b64_size( size_t len )
+{
 	return (len + 2 - ((len + 2) % 3)) / 3 * 4;
-} 
- 
-int b64_decode( char *dest, const char *src, size_t len ) 
-{ 
-	*dest = 0; 
-	if(*src == 0) 
-	{ 
-		return 0; 
-	} 
- 
-	char *p = dest; 
+}
 
-	do 
-	{ 
+int b64_decode( char *dest, const char *src, size_t len )
+{
+	*dest = 0;
+	if(*src == 0)
+	{
+		return 0;
+	}
+
+	char *p = dest;
+
+	do
+	{
 		char a = b64value(src[0]);
-		char b = b64value(src[1]); 
-		char c = b64value(src[2]); 
-		char d = b64value(src[3]); 
-		*p++ = (a << 2) | (b >> 4); 
+		char b = b64value(src[1]);
+		char c = b64value(src[2]);
+		char d = b64value(src[3]);
+		*p++ = (a << 2) | (b >> 4);
 		*p++ = (b << 4) | (c >> 2);
-		*p++ = (c << 6) | d; 
-		if(!isbase64(src[1])) 
-		{ 
-			p -= 2; 
-			break; 
-		} 
-		else if(!isbase64(src[2])) 
-		{ 
-			p -= 2; 
-			break; 
-		} 
-		else if(!isbase64(src[3])) 
-		{ 
-			p--; 
-			break; 
+		*p++ = (c << 6) | d;
+		if(!isbase64(src[1]))
+		{
+			p -= 2;
+			break;
 		}
-		src += 4; 
-		while(*src && (*src == 13 || *src == 10)) src++; 
-	} while( len-= 4 ); 
-	*p = 0; 
-	return p-dest; 
-} 
+		else if(!isbase64(src[2]))
+		{
+			p -= 2;
+			break;
+		}
+		else if(!isbase64(src[3]))
+		{
+			p--;
+			break;
+		}
+		src += 4;
+		while(*src && (*src == 13 || *src == 10)) src++;
+	} while( len-= 4 );
+	*p = 0;
+	return p-dest;
+}
 
 
-static inline char isbase64(char c) 
-{ 
-	return c && strchr(b64table, c) != NULL; 
-} 
- 
- 
-static inline char b64value(char c) 
-{ 
+static inline char isbase64(char c)
+{
+	return c && strchr(b64table, c) != NULL;
+}
+
+
+static inline char b64value(char c)
+{
 	const char *p = strchr(b64table, c);
-	if(p) { 
-		return p-b64table; 
+	if(p) {
+		return p-b64table;
 	} else {
-		return 0; 
-	} 
-} 
+		return 0;
+	}
+}
 

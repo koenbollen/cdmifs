@@ -1,14 +1,14 @@
-/* cdmifs, a filesystem interface based on the CDMI standard. 
- * Koen Bollen <meneer koenbollen nl> 
+/* cdmifs, a filesystem interface based on the CDMI standard.
+ * Koen Bollen <meneer koenbollen nl>
  * 2010 GPL
- */ 
-#ifndef CDMI_H 
+ */
+#ifndef CDMI_H
 #define CDMI_H 1
- 
-#ifndef SUCCESS 
+
+#ifndef SUCCESS
 # define SUCCESS 0
-#endif 
- 
+#endif
+
 #include <stdint.h>
 #include <jansson.h>
 
@@ -24,21 +24,23 @@
 #define CDMI_CONTENTTYPE (1<<5)
 
 
- 
-typedef struct _objectid 
-{ 
-	uint32_t enterprise; 
-	uint16_t length; 
-	uint16_t crc; 
-	char data[32]; 
-} objectid_t; 
- 
+
+typedef struct _objectid
+{
+	uint32_t enterprise;
+	uint16_t length;
+	uint16_t crc;
+	char data[32];
+} objectid_t;
+
 extern json_t *cdmi_get( const char *path, char **fields, int flags );
 extern int cdmi_put( const char *path, json_t *data, int flags );
 
-extern char *path2url( const char *path ); 
-extern int response_code2errno( long response_code ); 
-extern objectid_t objectid_decode( const char *b64data ); 
- 
-#endif /* !CDMI_H */ 
- 
+extern json_t *getmetadata( const char *path );
+
+extern char *path2url( const char *path );
+extern int response_code2errno( long response_code );
+extern objectid_t objectid_decode( const char *b64data );
+
+#endif /* !CDMI_H */
+

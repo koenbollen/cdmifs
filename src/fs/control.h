@@ -2,16 +2,22 @@
  * Koen Bollen <meneer koenbollen nl>
  * 2010 GPL
  */
-#ifndef CONTROL_H 
-#define CONTROL_H 1 
+#ifndef CONTROL_H
+#define CONTROL_H 1
 
-#include <sys/types.h> 
-#include "../common.h" 
- 
-extern int cdmifs_open( 
-		const char *path, 
-		struct fuse_file_info *fi 
-	); 
- 
-#endif /* !CONTROL_H */ 
- 
+#include <sys/types.h>
+#include "../common.h"
+
+extern int cdmifs_open(
+		const char *path,
+		struct fuse_file_info *fi
+	);
+
+extern int cdmifs_create(
+		const char *path,
+		mode_t mode,
+		struct fuse_file_info *fi
+	);
+
+#endif /* !CONTROL_H */
+

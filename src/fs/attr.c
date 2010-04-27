@@ -44,78 +44,78 @@ int cdmifs_getattr(
 		return -EPROTO;
 	}
 
-	if( parse_metadata( json_object_get(root, "metadata"), stbuf ) < 0 ) 
-	{ 
+	if( parse_metadata( json_object_get(root, "metadata"), stbuf ) < 0 )
+	{
 		DEBUG( "error: unable to parse metadata\n" );
 		json_decref( root );
-		return -EPROTO; 
-	} 
+		return -EPROTO;
+	}
 
-	json_decref( root ); 
- 
-	if( S_ISDIR( stbuf->st_mode ) ) 
-	{ 
+	json_decref( root );
+
+	if( S_ISDIR( stbuf->st_mode ) )
+	{
 		stbuf->st_mode |= 0755;
 		root = cdmi_get( path, (char*[]){"children",NULL}, CDMI_SINGLE );
-		if( root == NULL ) 
+		if( root == NULL )
 			return errno == 0 ? -EIO : -errno;
 
-		stbuf->st_nlink = 2; 
+		stbuf->st_nlink = 2;
 		for(i = 0; i < json_array_size(root); i++)
-		{ 
+		{
 			if( json_is_string( json_array_get(root, i) ) )
-			{ 
-				const char *cp = json_string_value(json_array_get(root, i)); 
+			{
+				const char *cp = json_string_value(json_array_get(root, i));
 				if( cp[strlen(cp)-1] == '/' )
-					(stbuf->st_nlink)++; 
-			} 
-		} 
- 
-		json_decref( root ); 
- 
-		return 0; 
-	} 
-	else 
-	{ 
-		stbuf->st_mode |= 0444; 
-		stbuf->st_nlink = 1; 
- 
-		return 0; 
-	} 
- 
-	return -ENOENT; 
-} 
- 
-static int parse_metadata( json_t *metadata, struct stat *stbuf ) 
-{ 
-	if( !json_is_object( metadata ) ) 
-		return -1; 
+					(stbuf->st_nlink)++;
+			}
+		}
 
-	if( json_is_integer( json_object_get(metadata, "cdmi_size") ) ) 
-		stbuf->st_size = json_integer_value( json_object_get(metadata, "cdmi_size") ); 
+		json_decref( root );
 
-	if( json_is_string( json_object_get(metadata, "cdmi_ctime") ) ) 
+		return 0;
+	}
+	else
 	{
-		stbuf->st_ctime = iso8601_decode( 
-				json_string_value( json_object_get(metadata, "cdmi_ctime") ) 
-			); 
-	} 
- 
-	if( json_is_string( json_object_get(metadata, "cdmi_atime") ) ) 
-	{
-		stbuf->st_atime = iso8601_decode( 
-				json_string_value( json_object_get(metadata, "cdmi_atime") ) 
-			); 
-	} 
+		stbuf->st_mode |= 0444;
+		stbuf->st_nlink = 1;
 
-	if( json_is_string( json_object_get(metadata, "cdmi_mtime") ) ) 
+		return 0;
+	}
+
+	return -ENOENT;
+}
+
+static int parse_metadata( json_t *metadata, struct stat *stbuf )
+{
+	if( !json_is_object( metadata ) )
+		return -1;
+
+	if( json_is_integer( json_object_get(metadata, "cdmi_size") ) )
+		stbuf->st_size = json_integer_value( json_object_get(metadata, "cdmi_size") );
+
+	if( json_is_string( json_object_get(metadata, "cdmi_ctime") ) )
 	{
-		stbuf->st_mtime = iso8601_decode( 
+		stbuf->st_ctime = iso8601_decode(
+				json_string_value( json_object_get(metadata, "cdmi_ctime") )
+			);
+	}
+
+	if( json_is_string( json_object_get(metadata, "cdmi_atime") ) )
+	{
+		stbuf->st_atime = iso8601_decode(
+				json_string_value( json_object_get(metadata, "cdmi_atime") )
+			);
+	}
+
+	if( json_is_string( json_object_get(metadata, "cdmi_mtime") ) )
+	{
+		stbuf->st_mtime = iso8601_decode(
 				json_string_value( json_object_get(metadata, "cdmi_mtime") )
-			); 
-	} 
+			);
+	}
 
-	return 0; 
-} 
- 
+	return 0;
+}
+
 

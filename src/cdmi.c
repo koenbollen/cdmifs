@@ -218,6 +218,7 @@ int cdmi_put( const char *path, json_t *data, int flags )
 	long code;
 	const char *rawdata = NULL;
 	size_t size = 0;
+	off_t offset = 0;
 
 	if( curl == NULL )
 	{
@@ -238,11 +239,30 @@ int cdmi_put( const char *path, json_t *data, int flags )
 	if( ISSET(flags, CDMI_DATAOBJECT) && ISSET(flags, CDMI_NONCDMI) )
 	{
 		if( !json_is_object( data ) )
+		{
+			fprintf( stderr, "error: no data\n" );
 			abort();
-		if( !json_is_string( json_object_get( data, "mimetype" ) ) )
+		}
+		if( !json_is_string( json_object_get(data, "mimetype") ) )
+		{
+			fprintf( stderr, "error: missing mimetype\n" );
 			abort();
-		if( !json_is_string( json_object_get( data, "value" ) ) )
+		}
+		if( json_is_string( json_object_get(data, "value") ) == NULL )
+		{
+			fprintf( stderr, "error: no value\n" );
 			abort();
+		}
+		if( json_object_get(data, "length") && !json_is_integer(json_object_get(data, "length") ) )
+		{
+			fprintf( stderr, "error: length isn't an integer\n" );
+			abort();
+		}
+		if( json_object_get(data, "offset") && !json_is_integer(json_object_get(data, "offset") ) )
+		{
+			fprintf( stderr, "error: offset isn't an integer\n" );
+			abort();
+		}
 	}
 #endif /* !NDEBUG */
 
@@ -263,9 +283,6 @@ int cdmi_put( const char *path, json_t *data, int flags )
 		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, noncdmi_headers );
 	else
 		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, headers );
-
-	DEBUGV( "info: cdmi_put %s\n", path2url( path ) );
-	curl_easy_setopt( curl, CURLOPT_URL, path2url( path ) );
 
 	if( cdmitype == CDMI_CONTAINER )
 	{
@@ -288,11 +305,24 @@ int cdmi_put( const char *path, json_t *data, int flags )
 			size = json_integer_value( json_object_get(data, "length") );
 			if( size < 1 )
 				size = strlen(json_string_value( value ));
+			offset = json_integer_value( json_object_get(data, "offset") );
 
 			noncdmi_headers = slist_replace(
 					noncdmi_headers, "Content-Type: %s",
 					json_string_value(mimetype)
 				);
+
+			if( offset != 0 )
+			{
+				noncdmi_headers = slist_replace(
+						noncdmi_headers, "Content-Range: bytes=%d-%d",
+						(int)offset, (int)offset+size-1 /* RFC2616 14.35.1, endpos is inclusive */
+					);
+			}
+			else
+			{
+				noncdmi_headers = slist_replace( noncdmi_headers, "Content-Range:" );
+			}
 
 			rawdata = json_string_value( value );
 
@@ -303,6 +333,9 @@ int cdmi_put( const char *path, json_t *data, int flags )
 			/* stub */
 		}
 	}
+
+	DEBUGV( "info: cdmi_put %s\n", path2url( path ) );
+	curl_easy_setopt( curl, CURLOPT_URL, path2url( path ) );
 
 	res = upload( curl, rawdata, size );
 	if( res != CURLE_OK )
@@ -327,6 +360,11 @@ int cdmi_put( const char *path, json_t *data, int flags )
 	}
 
 	return 1;
+}
+
+json_t *getmetadata( const char *path )
+{
+	return cdmi_get( path, (char*[]){"metadata",NULL}, CDMI_SINGLE|CDMI_CHECK );
 }
 
 char *path2url( const char *path )
