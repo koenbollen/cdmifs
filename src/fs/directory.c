@@ -25,7 +25,10 @@ int cdmifs_readdir(
 		off_t offset,
 		struct fuse_file_info *fi )
 {
-	int i;
+	(void)offset;
+	(void)fi;
+
+	unsigned int i;
 	const char *cp;
 	char childbuf[PATH_MAX];
 	json_t *children;
@@ -59,6 +62,8 @@ int cdmifs_readdir(
 
 int cdmifs_mkdir( const char *path, mode_t mode )
 {
+	(void)mode;
+
 	int ret;
 	ret = cdmi_put( path, NULL, CDMI_CONTAINER | CDMI_NONCDMI );
 	if( ret < 1 )

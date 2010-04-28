@@ -66,10 +66,12 @@ static struct fuse_opt opts[] =
 
 #if FUSE_VERSION >= 26
 static void *cdmifs_init(struct fuse_conn_info *conn)
+{
+	(void)conn;
 #else
 static void *cdmifs_init(void)
-#endif
 {
+#endif
 	if( !parse_uri() )
 	{
 		fprintf( stderr, "error: invalid uri: %s\n", options.uri );
@@ -154,6 +156,8 @@ static int parse_uri()
 
 static int cdmifs_opt_proc( void *data, const char *arg, int key, struct fuse_args *outargs )
 {
+	(void)data;
+	(void)outargs;
 	switch( key )
 	{
 		case FUSE_OPT_KEY_NONOPT:

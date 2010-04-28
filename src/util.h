@@ -28,9 +28,10 @@ extern void *errnull( int err ) ;
 
 extern struct curl_slist *slist_append( struct curl_slist * list, const char * format, ... );
 struct curl_slist *slist_replace( struct curl_slist * list, const char *format, ... );
-extern int b64_decode( char *dest, const char *src, size_t len );
-extern size_t b64_size( size_t len );
+extern size_t b64_dsize( size_t len );
+extern size_t b64_esize( size_t len );
 extern time_t iso8601_decode( const char *isoformat );
+extern int startswith( const char *data, const char *prefix );
 
 extern const char *mimetype( const void *buffer, size_t length );
 

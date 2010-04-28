@@ -19,6 +19,8 @@ int cdmifs_write(
 		const char *data, size_t size, off_t offset,
 		struct fuse_file_info *fi )
 {
+	(void)fi;
+
 	int ret;
 	json_t *meta, *info;
 

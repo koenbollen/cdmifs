@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <curl/curl.h>
 
@@ -29,6 +30,7 @@ static size_t read_callback( void *ptr, size_t size, size_t nmemb, void *data );
 
 CURLcode curl_defaults( CURL *curl, int flags )
 {
+	(void)flags;
 	CURLcode code;
 	CURLcode res;
 	res = CURLE_OK;

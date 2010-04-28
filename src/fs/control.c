@@ -22,6 +22,7 @@ static int cdmifs_common(
 		mode_t mode,
 		struct fuse_file_info *fi )
 {
+	(void)fi;
 	int ret, flags;
 	json_t *root;
 

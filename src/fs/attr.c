@@ -61,7 +61,7 @@ int cdmifs_getattr(
 			return errno == 0 ? -EIO : -errno;
 
 		stbuf->st_nlink = 2;
-		for(i = 0; i < json_array_size(root); i++)
+		for(i = 0; i < (int)json_array_size(root); i++)
 		{
 			if( json_is_string( json_array_get(root, i) ) )
 			{

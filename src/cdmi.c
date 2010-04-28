@@ -8,6 +8,8 @@
 #include "mime.h"
 #include "net.h"
 #include "util.h"
+#include "b64/cdecode.h"
+#include "b64/cencode.h"
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -216,7 +218,7 @@ int cdmi_put( const char *path, json_t *data, int flags )
 
 	CURLcode res;
 	long code;
-	const char *rawdata = NULL;
+	char *rawdata = NULL;
 	size_t size = 0;
 	off_t offset = 0;
 
@@ -248,7 +250,7 @@ int cdmi_put( const char *path, json_t *data, int flags )
 			fprintf( stderr, "error: missing mimetype\n" );
 			abort();
 		}
-		if( json_is_string( json_object_get(data, "value") ) == NULL )
+		if( !json_is_string( json_object_get(data, "value") ) )
 		{
 			fprintf( stderr, "error: no value\n" );
 			abort();
@@ -324,7 +326,31 @@ int cdmi_put( const char *path, json_t *data, int flags )
 				noncdmi_headers = slist_replace( noncdmi_headers, "Content-Range:" );
 			}
 
-			rawdata = json_string_value( value );
+			if( size > 0 )
+			{
+				if( startswith( json_string_value(mimetype), "text/" ) )
+				{
+					rawdata = strdup(json_string_value( value ));
+					if( !rawdata )
+						return -1;
+				}
+				else
+				{
+					int ret;
+					printf( "size: %d\n", size );
+					printf( "esize: %d\n", b64_esize( size ) );
+					rawdata = alloc( NULL, b64_esize( size ) * sizeof(char) );
+					if( !rawdata )
+						return -1;
+					memset(rawdata, 0, b64_esize(size) );
+					base64_encodestate state;
+					base64_init_encodestate( &state );
+					ret = base64_encode_block( (const char *)json_string_value( value ), size, rawdata, &state );
+					ret += base64_encode_blockend( rawdata+ret, &state );
+					rawdata[ret] = 0;
+					size = ret;
+				}
+			}
 
 			curl_easy_setopt( curl, CURLOPT_HTTPHEADER, noncdmi_headers );
 		}
@@ -340,6 +366,8 @@ int cdmi_put( const char *path, json_t *data, int flags )
 	res = upload( curl, rawdata, size );
 	if( res != CURLE_OK )
 	{
+		if( rawdata )
+			free( rawdata );
 		if( errno == 0 )
 			errno = EIO;
 		return -1;
@@ -349,15 +377,22 @@ int cdmi_put( const char *path, json_t *data, int flags )
 	res = curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &code );
 	if( res != CURLE_OK )
 	{
+		if( rawdata )
+			free( rawdata );
 		errno = EIO;
 		return -1;
 	}
 	code = response_code2errno( code );
 	if( code != SUCCESS )
 	{
+		if( rawdata )
+			free( rawdata );
 		errno = code;
 		return -1;
 	}
+
+	if( rawdata )
+		free( rawdata );
 
 	return 1;
 }
@@ -418,14 +453,16 @@ int response_code2errno( long response_code )
 objectid_t objectid_decode( const char *b64data )
 {
 	int ret;
-	size_t real_len;
+	int real_len;
 	char *real;
 
-	real_len = b64_size( strlen( b64data ) );
+	real_len = b64_dsize( strlen( b64data ) );
 	real = alloc( NULL, real_len );
 	assert( real != NULL );
 
-	ret = b64_decode( real, b64data, strlen(b64data) );
+	base64_decodestate b64state;
+	base64_init_decodestate( &b64state );
+	ret = base64_decode_block( b64data, strlen(b64data), real, &b64state );
 	assert( ret == real_len );
 
 	objectid_t objectid;
