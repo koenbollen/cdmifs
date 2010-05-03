@@ -22,15 +22,28 @@
 # define MAGIC_FILE NULL
 #endif
 
+inline void *long2pointer( unsigned long l )
+{
+	return (void*)((uintptr_t)l);
+}
+
 void *errnull( int err )
 {
 	errno = err;
 	return NULL;
 }
 
-const char *mimetype( const void *buffer, size_t length )
+int rerrno( int err )
+{
+	errno = err;
+	return -1;
+}
+
+const char *mimetype( const void *buffer, size_t length, const char *def )
 {
 	static magic_t handle = NULL;
+	if( def == NULL )
+		def = MAGIC_DEFAULT;
 	if( handle == NULL )
 	{
 		int ret;
@@ -39,14 +52,14 @@ const char *mimetype( const void *buffer, size_t length )
 		if( ret != 0 )
 		{
 			fprintf( stderr, "error: %s\n", magic_error( handle ) );
-			return MAGIC_DEFAULT;
+			return def;
 		}
 	}
 
 	const char *mime;
 	mime = magic_buffer( handle, buffer, length );
 	if( mime == NULL )
-		return MAGIC_DEFAULT;
+		return def;
 	return mime;
 }
 
@@ -80,6 +93,9 @@ struct curl_slist *slist_replace( struct curl_slist * list, const char *format, 
 	va_start(ap, format);
 	vsnprintf( buf, size, format, ap );
 	va_end(ap);
+
+	if( list == NULL )
+		return curl_slist_append( list, buf );
 
 	// Find the : char
 	cp = index( buf, ':' );

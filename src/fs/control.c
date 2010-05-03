@@ -22,35 +22,48 @@ static int cdmifs_common(
 		mode_t mode,
 		struct fuse_file_info *fi )
 {
-	(void)fi;
-	int ret, flags;
-	json_t *root;
+	int ret;
+	cdmi_request_t request;
 
-	flags = CDMI_DATAOBJECT;
+	memset( &request, 0, sizeof( cdmi_request_t ) );
+	request.type = GET;
+	request.cdmi = 1;
+	request.fields = (char*[]){"objectID","mimetype",NULL};
+	request.flags = CDMI_DATAOBJECT;
 	if( mode == 0 )
-		flags |= CDMI_CHECK;
-	root = cdmi_get( path, (char*[]){"objectID",NULL}, flags );
-	if( root == NULL && errno == ENOENT && mode != 0 )
+		request.flags |= CDMI_CHECK;
+	ret = cdmi_get( &request, path );
+	if( ret == -1 && errno == ENOENT && mode != 0 )
 	{
 		/* new file */
-		root = json_object();
-		json_object_set(root, "mimetype", json_string(MAGIC_DEFAULT) );
-		json_object_set(root, "length", json_integer( 0 ) );
-		json_object_set(root, "value", json_string("") );
-		ret = cdmi_put( path, root, CDMI_DATAOBJECT | CDMI_NONCDMI );
+		cdmi_free( &request );
+		memset( &request, 0, sizeof( cdmi_request_t ) );
+		request.type = PUT;
+		request.cdmi = 0;
+		request.length = 0;
+		request.rawdata = NULL;
+		request.contenttype = MAGIC_DEFAULT;
+		request.flags = CDMI_DATAOBJECT;
+		ret = cdmi_put( &request, path );
 		if( ret < 1 )
 			return errno == 0 ? -EIO : -errno;
-		json_decref( root );
-		return 0;
 	}
-	else if( root == NULL )
+	else if( ret == -1 )
+	{
+		cdmi_free( &request );
 		return errno == 0 ? -EIO : -errno;
+	}
 
-	json_decref( root );
+	json_t *handle = request.root;
+	json_incref( handle );
+	fi->fh = (unsigned long)handle;
+
+	cdmi_free( &request );
+
 	return 0;
 }
 
-extern int cdmifs_open(
+int cdmifs_open(
 		const char *path,
 		struct fuse_file_info *fi )
 {
@@ -66,4 +79,17 @@ int cdmifs_create(
 	return cdmifs_common( path, mode, fi );
 }
 
+int cdmifs_release(
+		const char *path,
+		struct fuse_file_info *fi )
+{
+	(void)path;
+	if( fi->fh != 0 )
+	{
+		json_t *root = long2pointer( fi->fh );
+		json_decref( root );
+		fi->fh = 0;
+	}
+	return 0;
+}
 

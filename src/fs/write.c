@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <jansson.h>
+#include <string.h>
 
 #include <unistd.h>
 int cdmifs_write(
@@ -19,33 +20,31 @@ int cdmifs_write(
 		const char *data, size_t size, off_t offset,
 		struct fuse_file_info *fi )
 {
-	(void)fi;
+	json_t *handle = long2pointer( fi->fh );
 
 	int ret;
-	json_t *meta, *info;
-
 	const char *mime = NULL;
-
-	meta = getmetadata( path );
-	if( meta && offset != 0 )
-		mime = json_string_value( json_object_get(meta, "mimetype") );
-	if( mime == NULL )
-		mime = mimetype(data, size);
-	json_decref( meta );
+	cdmi_request_t request;
 
 	if( data == NULL )
 		data = "";
 
-	errno = 0;
-	info = json_object();
-	json_object_set(info, "value", json_string_nocheck(data) );
-	json_object_set(info, "length", json_integer(size) );
-	json_object_set(info, "offset", json_integer(offset) );
-	json_object_set(info, "mimetype", json_string(mime) );
-	ret = cdmi_put( path, info, CDMI_DATAOBJECT | CDMI_NONCDMI );
-	json_decref( info );
+	mime = json_string_value( json_object_get(handle, "mimetype") );
+	if( offset == 0 )
+		mime = mimetype( data, size, mime );
+
+	memset( &request, 0, sizeof( cdmi_request_t ) );
+	request.type = PUT;
+	request.cdmi = 0;
+	request.rawdata = data;
+	request.length = size;
+	request.offset = offset;
+	request.flags = CDMI_DATAOBJECT;
+	ret = cdmi_put( &request, path );
+	cdmi_free( &request );
 	if( ret < 1 )
 		return errno == 0 ? -EIO : -errno;
 	return size;
 }
+
 

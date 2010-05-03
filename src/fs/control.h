@@ -19,5 +19,10 @@ extern int cdmifs_create(
 		struct fuse_file_info *fi
 	);
 
+extern int cdmifs_release(
+		const char *path,
+		struct fuse_file_info *fi
+	);
+
 #endif /* !CONTROL_H */
 

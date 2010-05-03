@@ -39,6 +39,7 @@ struct fuse_operations cdmifs_operations = {
 	 .mkdir    = cdmifs_mkdir,
 	 .open     = cdmifs_open,
 	 .create   = cdmifs_create,
+	 .release  = cdmifs_release,
 	 .read     = cdmifs_read,
 	 .write    = cdmifs_write
 };

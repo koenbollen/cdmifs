@@ -10,6 +10,7 @@
 #include "../util.h"
 #include "../b64/cdecode.h"
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -27,63 +28,33 @@ int cdmifs_read(
 		struct fuse_file_info *fi )
 {
 	(void)fi;
+	int ret;
 
-	json_t *root;
-	int ret, start, end;
-	char valuefield[32];
-	char *data = NULL;
+	cdmi_request_t request;
+	memset( &request, 0, sizeof( cdmi_request_t ) );
+	request.type = GET;
+	request.cdmi = 0;
+	request.offset = offset;
+	request.length = size;
+	request.flags = CDMI_DATAOBJECT;
 
-	sprintf( valuefield, "value:%d-%d", (int)offset, (int)offset+size );
-	root = cdmi_get( path, (char*[]){"valuerange", valuefield, "mimetype", NULL}, CDMI_DATAOBJECT | CDMI_CHECK );
-
-	ret = sscanf( json_string_value( json_object_get(root,"valuerange") ), "%u-%u", &start, &end );
-	if( ret != 2 )
+	ret = cdmi_get( &request, path );
+	if( ret == -1 )
 	{
-		json_decref(root);
-		return -EIO;
+		cdmi_free( &request );
+		return errno == 0 ? -EIO : -errno;
 	}
 
-	if( !json_is_string( json_object_get(root,"value") ) )
+	if( request.length > size )
 	{
-		json_decref(root);
-		return -EIO;
+		DEBUG( "recv more the needed!\n" );
+		request.length = size;
 	}
 
-	if( end-start > (int)size )
-	{
-		return -EPROTO;
-	}
+	memcpy( buf, request.rawdata, request.length );
 
-	data = NULL;
-	size = end-start;
-	if( !startswith( json_string_value( json_object_get(root, "mimetype") ), "text/" ) )
-	{
-		size = b64_dsize( end-start );
-		data = alloc( NULL, size );
-		if( data == NULL )
-			return -errno;
-
-		base64_decodestate state;
-		base64_init_decodestate( &state );
-		ret = base64_decode_block(
-				json_string_value(json_object_get(root,"value")),
-				end-start,
-				data,
-				&state
-			);
-		size = ret;
-	}
-
-	if( data == NULL )
-	{
-		memcpy( buf, json_string_value(json_object_get(root,"value")), size );
-	}
-	else
-	{
-		memcpy( buf, data, size );
-		free( data );
-	}
-	json_decref(root);
-	return size;
+	ret = request.length;
+	cdmi_free( &request );
+	return ret;
 }
 

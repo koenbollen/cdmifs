@@ -19,12 +19,16 @@
 # define MAGIC_DEFAULT "application/octet-stream"
 #endif
 
+extern inline void *long2pointer( unsigned long l );
+
 extern void *alloc( void *ptr, size_t size ) ;
 
 /**
  * Set the errno to the given errno and return NULL.
  */
 extern void *errnull( int err ) ;
+
+extern int rerrno( int err ) ;
 
 extern struct curl_slist *slist_append( struct curl_slist * list, const char * format, ... );
 struct curl_slist *slist_replace( struct curl_slist * list, const char *format, ... );
@@ -33,6 +37,6 @@ extern size_t b64_esize( size_t len );
 extern time_t iso8601_decode( const char *isoformat );
 extern int startswith( const char *data, const char *prefix );
 
-extern const char *mimetype( const void *buffer, size_t length );
+const char *mimetype( const void *buffer, size_t length, const char *def );
 
 #endif /* !UTIL_H */

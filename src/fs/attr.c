@@ -27,51 +27,63 @@ int cdmifs_getattr(
 		const char *path,
 		struct stat *stbuf )
 {
-	int i;
-	json_t *root;
+	int ret, i;
+	cdmi_request_t request;
 
-	root = cdmi_get( path, (char*[]){ "objectID", "metadata", NULL }, CDMI_CHECK | CDMI_CONTENTTYPE );
-	if( root == NULL )
+	memset( &request, 0, sizeof( cdmi_request_t ) );
+	request.type = GET;
+	request.cdmi = 1;
+	request.fields = (char*[]){ "objectID", "metadata", NULL };
+	request.flags = CDMI_CHECK;
+
+	ret = cdmi_get( &request, path );
+	if( ret == -1 )
 		return errno == 0 ? -EIO : -errno;
 
-	if( strcmp( json_string_value( json_object_get( root, "_contenttype" ) ), mime[M_CONTAINER] ) == 0 )
+	if( strcmp( request.contenttype, mime[M_CONTAINER] ) == 0 )
 		stbuf->st_mode = S_IFDIR;
-	else if( strcmp( json_string_value( json_object_get( root, "_contenttype" ) ), mime[M_DATAOBJECT] ) == 0 )
+	else if( strcmp( request.contenttype, mime[M_DATAOBJECT] ) == 0 )
 		stbuf->st_mode = S_IFREG;
 	else
 	{
-		json_decref( root );
+		cdmi_free( &request );
 		return -EPROTO;
 	}
 
-	if( parse_metadata( json_object_get(root, "metadata"), stbuf ) < 0 )
+	if( parse_metadata( json_object_get(request.root, "metadata"), stbuf ) < 0 )
 	{
 		DEBUG( "error: unable to parse metadata\n" );
-		json_decref( root );
+		cdmi_free( &request );
 		return -EPROTO;
 	}
 
-	json_decref( root );
+	cdmi_free( &request );
 
 	if( S_ISDIR( stbuf->st_mode ) )
 	{
 		stbuf->st_mode |= 0755;
-		root = cdmi_get( path, (char*[]){"children",NULL}, CDMI_SINGLE );
-		if( root == NULL )
+
+		memset( &request, 0, sizeof( cdmi_request_t ) );
+		request.type = GET;
+		request.cdmi = 1;
+		request.fields = (char*[]){"children",NULL};
+		request.flags = CDMI_SINGLE;
+		ret = cdmi_get( &request, path );
+		if( ret == -1 )
 			return errno == 0 ? -EIO : -errno;
 
 		stbuf->st_nlink = 2;
-		for(i = 0; i < (int)json_array_size(root); i++)
+		for(i = 0; i < (int)json_array_size(request.root); i++)
 		{
-			if( json_is_string( json_array_get(root, i) ) )
+			if( json_is_string( json_array_get(request.root, i) ) )
 			{
-				const char *cp = json_string_value(json_array_get(root, i));
+				const char *cp = json_string_value(json_array_get(request.root, i));
 				if( cp[strlen(cp)-1] == '/' )
 					(stbuf->st_nlink)++;
 			}
 		}
 
-		json_decref( root );
+		cdmi_free( &request );
 
 		return 0;
 	}

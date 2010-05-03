@@ -20,20 +20,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-json_t *cdmi_get( const char *path, char **fields, int flags )
+int cdmi_get( cdmi_request_t *request, const char *path )
 {
 	static CURL *curl = NULL;
 	static struct curl_slist *headers = NULL;
+	static struct curl_slist *noncdmi_headers = NULL;
 	static int cdmitype = 0;
+
+	uint32_t flags = request->flags;
 
 	CURLcode res;
 	char *cp, **cpp;
-	char *url, *data;
+	char *url;
+	double contentlength;
 	size_t urlsize;
 	long code;
-	json_t *root;
-	json_error_t jsonerr;
-
 
 	/* Setup curl object and the header.
 	 */
@@ -53,7 +54,7 @@ json_t *cdmi_get( const char *path, char **fields, int flags )
 	/* See what kind of object is requested and set the
 	 * appropriate Accept: header and cdmitype.
 	 */
-	if( (flags & CDMI_CONTAINER) == CDMI_CONTAINER )
+	if( ISSET(flags, CDMI_CONTAINER) )
 	{
 		if( cdmitype != CDMI_CONTAINER )
 		{
@@ -61,7 +62,7 @@ json_t *cdmi_get( const char *path, char **fields, int flags )
 			cdmitype = CDMI_CONTAINER;
 		}
 	}
-	else if( (flags & CDMI_DATAOBJECT) == CDMI_DATAOBJECT )
+	else if( ISSET(flags, CDMI_DATAOBJECT) )
 	{
 		if( cdmitype != CDMI_DATAOBJECT )
 		{
@@ -76,13 +77,18 @@ json_t *cdmi_get( const char *path, char **fields, int flags )
 	}
 
 
-	/* Place heaaders on the curl object if a cdmi request is
-	 * not noncdmi.
-	 */
-	if( (flags & CDMI_NONCDMI) == CDMI_NONCDMI )
-		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, NULL );
-	else
+	if( request->cdmi == 0 && request->length > 0 )
+	{
+		noncdmi_headers= slist_replace(
+				noncdmi_headers, "Range: bytes=%d-%d",
+				request->offset, request->offset+request->length-1
+			);
+	}
+
+	if( request->cdmi )
 		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, headers );
+	else
+		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, noncdmi_headers );
 
 
 	/* Build the url from the path and append the field
@@ -90,22 +96,22 @@ json_t *cdmi_get( const char *path, char **fields, int flags )
 	 */
 	url = path2url( path );
 	urlsize = strlen( url ) + 1;
-	if( fields != NULL )
-		for( cpp = fields, cp = *cpp; *cpp; cpp++, cp = *cpp )
+	if( request->fields != NULL )
+		for( cpp = request->fields, cp = *cpp; *cpp; cpp++, cp = *cpp )
 			urlsize += strlen( cp ) + 1;
 
 	url = strdup( url );
 
-	if( fields != NULL )
+	if( request->fields != NULL )
 	{
 		url = realloc( url, urlsize );
 		if( url == NULL )
-			return NULL;
-		for( cpp = fields, cp = *cpp; *cpp; cpp++, cp = *cpp )
+			return -1;
+		for( cpp = request->fields, cp = *cpp; *cpp; cpp++, cp = *cpp )
 		{
-			strcat( url, cpp == fields ? "?" : ";" );
+			strcat( url, cpp == request->fields ? "?" : ";" );
 			strcat( url, cp );
-			if( (flags & CDMI_SINGLE) == CDMI_SINGLE )
+			if( ISSET(flags, CDMI_SINGLE) )
 				break;
 		}
 	}
@@ -119,73 +125,75 @@ json_t *cdmi_get( const char *path, char **fields, int flags )
 	free( url ); /* curl's setopt does a strdup. */
 
 	errno = 0;
-	data = download( curl );
-	if( !data )
-		return errnull( errno == 0 ? EIO : errno );
-	//puts( data );
+	request->rawdata = download( curl );
+	if( !request->rawdata )
+		return -1;
+	/*puts( data );
+	 */
 
 	errno = 0;
 	res = curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &code );
 	if( res != CURLE_OK )
-		return errnull( EIO );
+		return -1;
+
 	code = response_code2errno( code );
 	if( code != SUCCESS )
-		return errnull( code );
+		return rerrno( code );
 
-	res = curl_easy_getinfo( curl, CURLINFO_CONTENT_TYPE, &cp );
-	if( res != CURLE_OK || cp == NULL )
-		return errnull( EPROTO );
-	if( (flags & CDMI_NONCDMI) != CDMI_NONCDMI )
+	res = curl_easy_getinfo( curl, CURLINFO_CONTENT_TYPE, &(request->contenttype) );
+	if( res != CURLE_OK || request->contenttype == NULL )
+		return -1;
+	if( request->cdmi )
 	{
-		if( cdmitype == CDMI_CONTAINER && strcmp( cp, mime[M_CONTAINER] ) != 0 )
-			return errnull( ENOTDIR );
+		if( cdmitype == CDMI_CONTAINER && strcmp( request->contenttype, mime[M_CONTAINER] ) != 0 )
+			return rerrno( ENOTDIR );
 		else if( cdmitype == CDMI_DATAOBJECT
-				&& strcmp( cp, mime[M_DATAOBJECT] ) != 0 )
-			return errnull( EISDIR );
+				&& strcmp( request->contenttype, mime[M_DATAOBJECT] ) != 0 )
+			return rerrno( EISDIR );
 	}
+
+	res = curl_easy_getinfo( curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &contentlength );
+	if( res != CURLE_OK )
+		return -1;
+	request->length = ( contentlength < 0 ) ? 0 : (unsigned int)contentlength;
+	request->offset = 0;
 
 	/* Load json data and check if it's correct, if CDMI_SINGLE is set
 	 * select the first item.
 	 */
-	if( (flags & CDMI_NONCDMI) == CDMI_NONCDMI && strcmp( cp, mime[M_JSON] ) != 0 )
+	if( request->cdmi || strcmp( request->contenttype, mime[M_JSON] ) == 0 )
 	{
-		root = json_object();
-		json_object_set( root, "value", json_string( data ) );
-	}
-	else
-	{
-		root = json_loads( data, &jsonerr );
-		if( root == NULL )
+		request->root = json_loads( request->rawdata, &(request->json_error) );
+		if( request->root == NULL )
 		{
-			DEBUGV( "error: json error on line %d: %s\n", jsonerr.line, jsonerr.text );
-			return errnull( EPROTO );
+			DEBUGV( "error: json error on line %d: %s\n",
+					(request->json_error).line,
+					(request->json_error).text );
+			errno = EPROTO;
+			return -1;
 		}
 	}
 
-	if( (flags & CDMI_CONTENTTYPE) == CDMI_CONTENTTYPE && json_is_object(root) )
+	if( ISSET(flags, CDMI_CHECK) )
 	{
-		json_object_set( root, "_contenttype", json_string( cp ) );
-	}
-
-	if( (flags & CDMI_CHECK) == CDMI_CHECK )
-	{
-		if( !json_is_object( root ) )
+		if( !json_is_object( request->root ) )
 		{
-			json_decref( root );
-			return errnull( EPROTO );
+			json_decref( request->root );
+			errno = EPROTO;
+			return -1;
 		}
-		for( cpp = fields, cp = *cpp; *cpp; cpp++, cp = *cpp )
+		for( cpp = request->fields, cp = *cpp; *cpp; cpp++, cp = *cpp )
 		{
 			char *field = strdup( cp );
 			cp = index(field, ':' );
 			if( cp != NULL)
 				*cp = 0;
-			if( json_object_get( root, field ) == NULL )
+			if( json_object_get( request->root, field ) == NULL )
 			{
 				free( field );
-				json_decref( root );
 				DEBUGV( "error: missing json element: %s\n", cp );
-				return errnull( EPROTO );
+				errno = EPROTO;
+				return -1;
 			}
 			free( field );
 		}
@@ -193,34 +201,33 @@ json_t *cdmi_get( const char *path, char **fields, int flags )
 
 	/* Select the first fields.
 	 */
-	if( (flags & CDMI_SINGLE) == CDMI_SINGLE && ( fields != NULL || cdmitype == CDMI_DATAOBJECT ) )
+	if( ISSET(flags, CDMI_SINGLE) && ( request->fields != NULL || cdmitype == CDMI_DATAOBJECT ) )
 	{
-		if( json_is_object( root ) )
+		if( json_is_object( request->root ) )
 		{
-			json_t *parent = root;
-			root = json_object_get( root, fields == NULL ? "value" : *fields );
-			if( root != NULL )
-				json_incref( root );
+			json_t *parent = request->root;
+			request->root = json_object_get( request->root, request->fields == NULL ? "value" : request->fields[0] );
+			if( request->root != NULL )
+				json_incref( request->root );
 			json_decref( parent );
 		}
 	}
 
-	return root;
+	return 1;
 }
 
 
-int cdmi_put( const char *path, json_t *data, int flags )
+int cdmi_put( cdmi_request_t *request, const char *path )
 {
 	static CURL *curl = NULL;
 	static struct curl_slist *headers = NULL;
 	static struct curl_slist *noncdmi_headers = NULL;
 	static int cdmitype = 0;
 
+	uint32_t flags = request->flags;
+
 	CURLcode res;
 	long code;
-	char *rawdata = NULL;
-	size_t size = 0;
-	off_t offset = 0;
 
 	if( curl == NULL )
 	{
@@ -235,34 +242,14 @@ int cdmi_put( const char *path, json_t *data, int flags )
 	}
 
 	assert( ISSET(flags, CDMI_CONTAINER) || ISSET(flags, CDMI_DATAOBJECT) );
-	assert( ISSET(flags, CDMI_NONCDMI) ); /* only supported */
+	assert( request->cdmi == 0 ); /* only supported */
 
 #ifndef NDEBUG
-	if( ISSET(flags, CDMI_DATAOBJECT) && ISSET(flags, CDMI_NONCDMI) )
+	if( ISSET(flags, CDMI_DATAOBJECT) && !request->cdmi )
 	{
-		if( !json_is_object( data ) )
+		if( request->length > 0 && request->rawdata == NULL )
 		{
 			fprintf( stderr, "error: no data\n" );
-			abort();
-		}
-		if( !json_is_string( json_object_get(data, "mimetype") ) )
-		{
-			fprintf( stderr, "error: missing mimetype\n" );
-			abort();
-		}
-		if( !json_is_string( json_object_get(data, "value") ) )
-		{
-			fprintf( stderr, "error: no value\n" );
-			abort();
-		}
-		if( json_object_get(data, "length") && !json_is_integer(json_object_get(data, "length") ) )
-		{
-			fprintf( stderr, "error: length isn't an integer\n" );
-			abort();
-		}
-		if( json_object_get(data, "offset") && !json_is_integer(json_object_get(data, "offset") ) )
-		{
-			fprintf( stderr, "error: offset isn't an integer\n" );
 			abort();
 		}
 	}
@@ -281,14 +268,14 @@ int cdmi_put( const char *path, json_t *data, int flags )
 		cdmitype = CDMI_DATAOBJECT;
 	}
 
-	if( ISSET(flags, CDMI_NONCDMI) )
-		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, noncdmi_headers );
-	else
+	if( request->cdmi )
 		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, headers );
+	else
+		curl_easy_setopt( curl, CURLOPT_HTTPHEADER, noncdmi_headers );
 
 	if( cdmitype == CDMI_CONTAINER )
 	{
-		if( ISSET(flags, CDMI_NONCDMI) )
+		if( !request->cdmi )
 		{
 			noncdmi_headers = slist_replace( noncdmi_headers, "Content-Type:" );
 		}
@@ -299,26 +286,20 @@ int cdmi_put( const char *path, json_t *data, int flags )
 	}
 	else
 	{
-		if( ISSET(flags, CDMI_NONCDMI) )
+		if( !request->cdmi )
 		{
-			json_t *value = json_object_get(data, "value");
-			json_t *mimetype = json_object_get(data, "mimetype");
-
-			size = json_integer_value( json_object_get(data, "length") );
-			if( size < 1 )
-				size = strlen(json_string_value( value ));
-			offset = json_integer_value( json_object_get(data, "offset") );
+			unsigned int offset = request->offset;
+			unsigned int length = request->length;
 
 			noncdmi_headers = slist_replace(
-					noncdmi_headers, "Content-Type: %s",
-					json_string_value(mimetype)
+					noncdmi_headers, "Content-Type: %s", request->contenttype
 				);
 
 			if( offset != 0 )
 			{
 				noncdmi_headers = slist_replace(
 						noncdmi_headers, "Content-Range: bytes=%d-%d",
-						(int)offset, (int)offset+size-1 /* RFC2616 14.35.1, endpos is inclusive */
+						(int)offset, (int)offset+length-1 /* RFC2616 14.35.1, endpos is inclusive, hence the -1 */
 					);
 			}
 			else
@@ -326,32 +307,7 @@ int cdmi_put( const char *path, json_t *data, int flags )
 				noncdmi_headers = slist_replace( noncdmi_headers, "Content-Range:" );
 			}
 
-			if( size > 0 )
-			{
-				if( startswith( json_string_value(mimetype), "text/" ) )
-				{
-					rawdata = strdup(json_string_value( value ));
-					if( !rawdata )
-						return -1;
-				}
-				else
-				{
-					int ret;
-					printf( "size: %d\n", size );
-					printf( "esize: %d\n", b64_esize( size ) );
-					rawdata = alloc( NULL, b64_esize( size ) * sizeof(char) );
-					if( !rawdata )
-						return -1;
-					memset(rawdata, 0, b64_esize(size) );
-					base64_encodestate state;
-					base64_init_encodestate( &state );
-					ret = base64_encode_block( (const char *)json_string_value( value ), size, rawdata, &state );
-					ret += base64_encode_blockend( rawdata+ret, &state );
-					rawdata[ret] = 0;
-					size = ret;
-				}
-			}
-
+			//printf( "D in cdmi_put offset: %d; size: %d\n", (int)offset, length );
 			curl_easy_setopt( curl, CURLOPT_HTTPHEADER, noncdmi_headers );
 		}
 		else
@@ -363,11 +319,10 @@ int cdmi_put( const char *path, json_t *data, int flags )
 	DEBUGV( "info: cdmi_put %s\n", path2url( path ) );
 	curl_easy_setopt( curl, CURLOPT_URL, path2url( path ) );
 
-	res = upload( curl, rawdata, size );
+	//printf( "string(%d) = \"%s\"\n", size, rawdata );
+	res = upload( curl, request->rawdata, request->length );
 	if( res != CURLE_OK )
 	{
-		if( rawdata )
-			free( rawdata );
 		if( errno == 0 )
 			errno = EIO;
 		return -1;
@@ -377,29 +332,40 @@ int cdmi_put( const char *path, json_t *data, int flags )
 	res = curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &code );
 	if( res != CURLE_OK )
 	{
-		if( rawdata )
-			free( rawdata );
 		errno = EIO;
 		return -1;
 	}
 	code = response_code2errno( code );
 	if( code != SUCCESS )
 	{
-		if( rawdata )
-			free( rawdata );
 		errno = code;
 		return -1;
 	}
 
-	if( rawdata )
-		free( rawdata );
-
 	return 1;
+}
+
+void cdmi_free( cdmi_request_t *request )
+{
+	if( request->root != NULL )
+		json_decref( request->root );
 }
 
 json_t *getmetadata( const char *path )
 {
-	return cdmi_get( path, (char*[]){"metadata",NULL}, CDMI_SINGLE|CDMI_CHECK );
+	int ret;
+	cdmi_request_t request;
+
+	memset( &request, 0, sizeof( cdmi_request_t ) );
+	request.type = GET;
+	request.cdmi = 1;
+	request.fields = (char*[]){"metadata",NULL};
+	request.flags = CDMI_SINGLE | CDMI_CHECK;
+
+	ret = cdmi_get( &request, path );
+	if( ret == -1 )
+		return NULL;
+	return request.root;
 }
 
 char *path2url( const char *path )
@@ -426,6 +392,8 @@ int response_code2errno( long response_code )
 		case 202: /* Accepted - Long running operation accepted for processing*/
 			return EINPROGRESS;
 		case 204: /* No Content - Operation successful, no data */
+			return SUCCESS;
+		case 206: /* Partial Content - Part read */
 			return SUCCESS;
 		case 400: /* Bad Request - Missing or invalid request contents */
 			return EPROTO;

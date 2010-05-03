@@ -66,7 +66,7 @@ char *download( CURL *curl )
 	curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, write_callback );
 
 	res = curl_easy_perform( curl);
-	if( res != CURLE_OK )
+	if( res != CURLE_OK && res != CURLE_PARTIAL_FILE )
 	{
 		long err;
 		curl_easy_getinfo( curl, CURLINFO_OS_ERRNO, &err );
@@ -87,6 +87,18 @@ CURLcode upload( CURL *curl, const char *data, size_t size )
 	block.data = (char*)data;
 	block.size = size;
 	block.pos = 0;
+
+	/*
+	printf( "Uploading %d bytes of data:\n", size );
+	unsigned int i;
+	for( i = 0; i < size; i++ )
+	{
+		printf( "%02x ", (char)data[i]&0xff );
+		if( i != 0 && i  % 25 == 0 )
+			printf( "\n" );
+	}
+	printf( "\n" );
+	*/
 
 	curl_easy_setopt( curl, CURLOPT_UPLOAD, 1L );
 	if( data != NULL && size > 0 )
@@ -139,6 +151,9 @@ static size_t read_callback( void *ptr, size_t size, size_t nmemb, void *data )
 	if( left < length )
 		length = left;
 
+	if( length <= 0 )
+		return 0;
+
 	memcpy( ptr, buf->data, length );
 	buf->pos += length;
 
@@ -151,7 +166,20 @@ static size_t write_callback( void *ptr, size_t size, size_t nmemb, void *stream
 		return 0;
 	size_t length = size * nmemb;
 	struct buffer *buf = (struct buffer *)stream;
-	//fprintf( stderr, "pos: %d\nsiz: %d\nlen: %d\n", buf->pos, buf->size, length );
+
+	/*
+	printf( "pos: %d siz: %d\n", buf->pos, buf->size );
+	printf( "Read %d bytes:\n", length );
+	unsigned int i;
+	for( i = 0; i < length; i++ )
+	{
+		printf( "%02x ", (char)(((char*)ptr)[i]&0xff) );
+		if( i != 0 && i  % 25 == 0 )
+			printf( "\n" );
+	}
+	printf( "\n" );
+	*/
+
 	if( buf->pos + length + 1 > buf->size )
 	{
 		buf->size = buf->pos + length + 1;
