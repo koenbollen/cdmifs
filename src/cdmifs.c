@@ -41,7 +41,8 @@ struct fuse_operations cdmifs_operations = {
 	 .create   = cdmifs_create,
 	 .release  = cdmifs_release,
 	 .read     = cdmifs_read,
-	 .write    = cdmifs_write
+	 .write    = cdmifs_write,
+	 .truncate = cdmifs_truncate
 };
 
 struct options options;

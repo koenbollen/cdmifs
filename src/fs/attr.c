@@ -89,7 +89,7 @@ int cdmifs_getattr(
 	}
 	else
 	{
-		stbuf->st_mode |= 0444;
+		stbuf->st_mode |= 0644;
 		stbuf->st_nlink = 1;
 
 		return 0;

@@ -297,10 +297,20 @@ int cdmi_put( cdmi_request_t *request, const char *path )
 
 			if( offset != 0 )
 			{
-				noncdmi_headers = slist_replace(
-						noncdmi_headers, "Content-Range: bytes=%d-%d",
-						(int)offset, (int)offset+length-1 /* RFC2616 14.35.1, endpos is inclusive, hence the -1 */
-					);
+				if( length == 0 )
+				{
+					noncdmi_headers = slist_replace(
+							noncdmi_headers, "Content-Range: bytes=%d-",
+							(int)offset
+						);
+				}
+				else
+				{
+					noncdmi_headers = slist_replace(
+							noncdmi_headers, "Content-Range: bytes=%d-%d",
+							(int)offset, (int)offset+length-1 /* RFC2616 14.35.1, endpos is inclusive, hence the -1 */
+						);
+				}
 			}
 			else
 			{

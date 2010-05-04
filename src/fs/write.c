@@ -47,4 +47,22 @@ int cdmifs_write(
 	return size;
 }
 
+int cdmifs_truncate( const char *path, off_t offset )
+{
+	cdmi_request_t request;
+	int ret;
+
+	memset( &request, 0, sizeof( cdmi_request_t ) );
+	request.type = PUT;
+	request.cdmi = 0;
+	request.rawdata = NULL;
+	request.length = 0;
+	request.offset = offset;
+	request.flags = CDMI_DATAOBJECT;
+	ret = cdmi_put( &request, path );
+
+	if( ret == -1 )
+		return errno == 0 ? -EIO : -errno;
+	return 0;
+}
 

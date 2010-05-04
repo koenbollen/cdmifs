@@ -22,6 +22,9 @@ extern int cdmifs_write(
 		struct fuse_file_info *fi );
 
 
+/** Change the size of a file */
+extern int cdmifs_truncate( const char *path, off_t offset );
+
 #endif /* !WRITE_H */
 
 
