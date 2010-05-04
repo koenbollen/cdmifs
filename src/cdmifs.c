@@ -37,12 +37,14 @@ struct fuse_operations cdmifs_operations = {
 	 .getattr  = cdmifs_getattr,
 	 .readdir  = cdmifs_readdir,
 	 .mkdir    = cdmifs_mkdir,
+	 .rmdir    = cdmifs_rmdir,
 	 .open     = cdmifs_open,
 	 .create   = cdmifs_create,
 	 .release  = cdmifs_release,
 	 .read     = cdmifs_read,
 	 .write    = cdmifs_write,
-	 .truncate = cdmifs_truncate
+	 .truncate = cdmifs_truncate,
+	 .unlink   = cdmifs_unlink
 };
 
 struct options options;

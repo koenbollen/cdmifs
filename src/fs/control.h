@@ -24,5 +24,8 @@ extern int cdmifs_release(
 		struct fuse_file_info *fi
 	);
 
+extern int cdmifs_unlink( const char *path );
+
+
 #endif /* !CONTROL_H */
 

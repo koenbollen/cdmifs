@@ -355,6 +355,55 @@ int cdmi_put( cdmi_request_t *request, const char *path )
 	return 1;
 }
 
+int cdmi_delete( cdmi_request_t *request, const char *path )
+{
+	static CURL *curl;
+	//static struct curl_slist *headers = NULL;
+
+	assert( request->cdmi == 0 ); /* only supported in this function */
+
+	if( curl == NULL )
+	{
+		curl = curl_easy_init();
+		curl_defaults( curl, 0 );
+	}
+
+	CURLcode res;
+	long code;
+
+	DEBUGV( "info: cdmi_delete %s\n", path2url( path ) );
+	curl_easy_setopt( curl, CURLOPT_URL, path2url( path ) );
+
+	curl_easy_setopt( curl, CURLOPT_NOBODY, 1L );
+	curl_easy_setopt( curl, CURLOPT_CUSTOMREQUEST, "DELETE" );
+
+	res = curl_easy_perform( curl );
+	if( res != CURLE_OK )
+	{
+		long err;
+		curl_easy_getinfo( curl, CURLINFO_OS_ERRNO, &err );
+		errno = err == 0 ? EIO : err;
+		return -1;
+	}
+
+	errno = 0;
+	res = curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &code );
+	if( res != CURLE_OK )
+	{
+		errno = EIO;
+		return -1;
+	}
+	errno = response_code2errno( code );
+	if( errno != SUCCESS )
+	{
+		if( code == 409 )
+			errno = ENOTEMPTY;
+		return -1;
+	}
+
+	return 1;
+}
+
 void cdmi_free( cdmi_request_t *request )
 {
 	if( request->root != NULL )

@@ -55,6 +55,7 @@ typedef struct _objectid
 
 extern int cdmi_get( cdmi_request_t *request, const char *path );
 extern int cdmi_put( cdmi_request_t *request, const char *path );
+extern int cdmi_delete( cdmi_request_t *request, const char *path );
 extern void cdmi_free( cdmi_request_t *request );
 
 extern json_t *getmetadata( const char *path );

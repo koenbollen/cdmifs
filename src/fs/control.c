@@ -93,3 +93,16 @@ int cdmifs_release(
 	return 0;
 }
 
+int cdmifs_unlink( const char *path )
+{
+	int ret;
+	cdmi_request_t request;
+	memset( &request, 0, sizeof( cdmi_request_t ) );
+	request.type = DELETE;
+	request.cdmi = 0;
+	ret = cdmi_delete( &request, path );
+	if( ret == -1 )
+		return errno == 0 ? -EIO : -errno;
+	return 0;
+}
+
