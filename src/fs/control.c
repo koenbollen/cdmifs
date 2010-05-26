@@ -5,6 +5,7 @@
 #include "control.h"
 
 #include "../cdmi.h"
+#include "../mime.h"
 #include "../common.h"
 #include "../net.h"
 #include "../util.h"
@@ -106,3 +107,34 @@ int cdmifs_unlink( const char *path )
 	return 0;
 }
 
+int cdmifs_rename(const char *path, const char *dest)
+{
+	int ret, flags = 0;
+	cdmi_request_t request;
+
+	memset( &request, 0, sizeof( cdmi_request_t ) );
+	request.type = GET;
+	request.cdmi = 1;
+	request.fields = (char*[]){ "objectID", "metadata", NULL };
+	request.flags = CDMI_CHECK;
+
+	ret = cdmi_get( &request, path );
+	if( ret == -1 )
+		return errno == 0 ? -EIO : -errno;
+	if( strcmp( request.contenttype, mime[M_CONTAINER] ) == 0 )
+		flags = CDMI_CONTAINER;
+	else if( strcmp( request.contenttype, mime[M_DATAOBJECT] ) == 0 )
+		flags = CDMI_DATAOBJECT;
+
+	memset( &request, 0, sizeof( cdmi_request_t ) );
+	request.type = MOVE;
+	request.cdmi = 1;
+	request.src = path;
+	request.flags = flags;
+
+	ret = cdmi_put( &request, dest );
+	if( ret == -1 )
+		return errno == 0 ? -EIO : -errno;
+
+	return 0;
+}

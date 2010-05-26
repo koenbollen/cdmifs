@@ -228,6 +228,7 @@ int cdmi_put( cdmi_request_t *request, const char *path )
 
 	CURLcode res;
 	long code;
+	char *data = NULL;
 
 	if( curl == NULL )
 	{
@@ -241,10 +242,13 @@ int cdmi_put( cdmi_request_t *request, const char *path )
 		noncdmi_headers = slist_append( noncdmi_headers, "Expect:" );
 	}
 
-	assert( ISSET(flags, CDMI_CONTAINER) || ISSET(flags, CDMI_DATAOBJECT) );
-	assert( request->cdmi == 0 ); /* only supported */
-
 #ifndef NDEBUG
+	if( request->type != MOVE )
+	{
+		assert( ISSET(flags, CDMI_CONTAINER) || ISSET(flags, CDMI_DATAOBJECT) );
+		assert( request->cdmi == 0 ); /* only supported */
+	}
+
 	if( ISSET(flags, CDMI_DATAOBJECT) && !request->cdmi )
 	{
 		if( request->length > 0 && request->rawdata == NULL )
@@ -281,7 +285,17 @@ int cdmi_put( cdmi_request_t *request, const char *path )
 		}
 		else
 		{
-			/* stub */
+			if( request->type == MOVE )
+			{
+				json_t *root = json_object();
+				json_object_set( root, "move", json_string( path2path(request->src) ) );
+				data = json_dumps( root, JSON_INDENT(1) );
+				json_decref( root );
+				data = realloc( data, strlen(data)+2 );
+				strcat( data, "\n" );
+				puts( data );
+				headers = slist_replace( headers, "Expect:" );
+			}
 		}
 	}
 	else
@@ -322,15 +336,26 @@ int cdmi_put( cdmi_request_t *request, const char *path )
 		}
 		else
 		{
-			/* stub */
+			if( request->type == MOVE )
+			{
+				json_t *root = json_object();
+				json_object_set( root, "move", json_string( path2path(request->src) ) );
+				data = json_dumps( root, JSON_INDENT(1) );
+				json_decref( root );
+				data = realloc( data, strlen(data)+2 );
+				strcat( data, "\n" );
+				puts( data );
+				headers = slist_replace( headers, "Expect:" );
+			}
 		}
 	}
 
 	DEBUGV( "info: cdmi_put %s\n", path2url( path ) );
 	curl_easy_setopt( curl, CURLOPT_URL, path2url( path ) );
 
-	//printf( "string(%d) = \"%s\"\n", size, rawdata );
-	res = upload( curl, request->rawdata, request->length );
+	res = upload( curl, data ? data : request->rawdata, data ? strlen(data) : request->length );
+	if( data )
+		free( data );
 	if( res != CURLE_OK )
 	{
 		if( errno == 0 )
@@ -438,6 +463,20 @@ char *path2url( const char *path )
 			options.root, path
 		);
 	return url;
+}
+
+char *path2path( const char *path )
+{
+	static char url[URLSIZE+1];
+	if( startswith( path, options.root ) )
+		return strcpy( url, path );
+	if( path[0] == '/' )
+		path++;
+	url[0] = 0;
+	snprintf( url, URLSIZE, "%s/%s",
+			options.root, path );
+	return url;
+
 }
 
 int response_code2errno( long response_code )

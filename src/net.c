@@ -47,6 +47,16 @@ CURLcode curl_defaults( CURL *curl, int flags )
 		if( code != CURLE_OK && res == CURLE_OK ) res = code;
 	}
 
+	if( options.username != NULL && options.password != NULL )
+	{
+		code = curl_easy_setopt( curl, CURLOPT_HTTPAUTH, CURLAUTH_ANYSAFE );
+		if( code != CURLE_OK && res == CURLE_OK ) res = code;
+		code = curl_easy_setopt( curl, CURLOPT_USERNAME, options.username );
+		if( code != CURLE_OK && res == CURLE_OK ) res = code;
+		code = curl_easy_setopt( curl, CURLOPT_PASSWORD, options.password );
+		if( code != CURLE_OK && res == CURLE_OK ) res = code;
+	}
+
 	return res;
 }
 char *download( CURL *curl )

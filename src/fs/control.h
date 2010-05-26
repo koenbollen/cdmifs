@@ -26,6 +26,8 @@ extern int cdmifs_release(
 
 extern int cdmifs_unlink( const char *path );
 
+extern int cdmifs_rename(const char *path, const char *dest);
+
 
 #endif /* !CONTROL_H */
 

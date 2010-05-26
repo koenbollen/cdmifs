@@ -131,3 +131,10 @@ static int parse_metadata( json_t *metadata, struct stat *stbuf )
 }
 
 
+int cdmifs_utimens( const char *path, const struct timespec tv[2] )
+{
+	(void)path;
+	(void)tv;
+	return 0;
+}
+

@@ -23,13 +23,15 @@
 
 typedef enum _cdmi_request_type
 {
-	GET, PUT, DELETE
+	GET, PUT, DELETE, MOVE
 } cdmi_request_type_t;
 
 typedef struct _cdmi_request
 {
 	cdmi_request_type_t type;
 	int cdmi;
+
+	const char *src;
 
 	char **fields;
 
@@ -61,6 +63,7 @@ extern void cdmi_free( cdmi_request_t *request );
 extern json_t *getmetadata( const char *path );
 
 extern char *path2url( const char *path );
+extern char *path2path( const char *path );
 extern int response_code2errno( long response_code );
 extern objectid_t objectid_decode( const char *b64data );
 

@@ -44,7 +44,9 @@ struct fuse_operations cdmifs_operations = {
 	 .read     = cdmifs_read,
 	 .write    = cdmifs_write,
 	 .truncate = cdmifs_truncate,
-	 .unlink   = cdmifs_unlink
+	 .unlink   = cdmifs_unlink,
+	 .utimens  = cdmifs_utimens,
+	 .rename  = cdmifs_rename
 };
 
 struct options options;
@@ -56,6 +58,11 @@ enum
 };
 static struct fuse_opt opts[] =
 {
+	OPT_KEY("-u %s", username, 0),
+	OPT_KEY("--username %s", username, 0),
+	OPT_KEY("-p %s", password, 0),
+	OPT_KEY("--password %s", password, 0),
+
 	OPT_KEY("cdmifs_debug", debug, 1),
 	OPT_KEY("curl_debug", curl_debug, 1),
 	OPT_KEY("ssl",          ssl, 1),
@@ -87,6 +94,7 @@ static void *cdmifs_init(void)
 	DEBUGV( " host: %s\n", options.host );
 	DEBUGV( " port: %s\n", options.port );
 	DEBUGV( " root: %s\n", options.root );
+	DEBUGV( " user: %s\n", options.username );
 
 	curl_global_init( CURL_GLOBAL_ALL );
 
