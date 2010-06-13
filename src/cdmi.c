@@ -314,21 +314,21 @@ int cdmi_put( cdmi_request_t *request, const char *path )
 				if( length == 0 )
 				{
 					noncdmi_headers = slist_replace(
-							noncdmi_headers, "Content-Range: bytes=%d-",
+							noncdmi_headers, "Range: bytes=%d-",
 							(int)offset
 						);
 				}
 				else
 				{
 					noncdmi_headers = slist_replace(
-							noncdmi_headers, "Content-Range: bytes=%d-%d",
+							noncdmi_headers, "Range: bytes=%d-%d",
 							(int)offset, (int)offset+length-1 /* RFC2616 14.35.1, endpos is inclusive, hence the -1 */
 						);
 				}
 			}
 			else
 			{
-				noncdmi_headers = slist_replace( noncdmi_headers, "Content-Range:" );
+				noncdmi_headers = slist_replace( noncdmi_headers, "Range:" );
 			}
 
 			//printf( "D in cdmi_put offset: %d; size: %d\n", (int)offset, length );
