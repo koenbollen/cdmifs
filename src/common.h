@@ -37,6 +37,9 @@ struct options
 
 	int debug;
 	int curl_debug;
+
+
+	int gotmeta;
 };
 extern struct options options;
 

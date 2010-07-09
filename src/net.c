@@ -111,6 +111,8 @@ CURLcode upload( CURL *curl, const char *data, size_t size )
 	*/
 
 	curl_easy_setopt( curl, CURLOPT_UPLOAD, 1L );
+	curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, write_callback );
+	curl_easy_setopt( curl, CURLOPT_WRITEDATA, NULL );
 	if( data != NULL && size > 0 )
 	{
 		curl_easy_setopt( curl, CURLOPT_READFUNCTION, read_callback );
@@ -173,7 +175,7 @@ static size_t read_callback( void *ptr, size_t size, size_t nmemb, void *data )
 static size_t write_callback( void *ptr, size_t size, size_t nmemb, void *stream )
 {
 	if( stream == NULL )
-		return 0;
+		return size*nmemb;
 	size_t length = size * nmemb;
 	struct buffer *buf = (struct buffer *)stream;
 

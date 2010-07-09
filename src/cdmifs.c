@@ -5,6 +5,7 @@
 #include "common.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <fuse.h>
 #include <fuse_opt.h>
 #include <stdio.h>
@@ -16,6 +17,7 @@
 
 #include "net.h"
 #include "util.h"
+#include "cdmi.h"
 
 #include "fs/attr.h"
 #include "fs/control.h"
@@ -25,6 +27,7 @@
 
 static int parse_uri();
 static int cdmifs_opt_proc( void *data, const char *arg, int key, struct fuse_args *outargs );
+static void cdmifs_capabilities();
 #if FUSE_VERSION >= 26
 static void *cdmifs_init(struct fuse_conn_info *conn);
 #else
@@ -46,7 +49,8 @@ struct fuse_operations cdmifs_operations = {
 	 .truncate = cdmifs_truncate,
 	 .unlink   = cdmifs_unlink,
 	 .utimens  = cdmifs_utimens,
-	 .rename  = cdmifs_rename
+	 .rename   = cdmifs_rename,
+	 .chmod    = cdmifs_chmod
 };
 
 struct options options;
@@ -95,6 +99,8 @@ static void *cdmifs_init(void)
 	DEBUGV( " port: %s\n", options.port );
 	DEBUGV( " root: %s\n", options.root );
 	DEBUGV( " user: %s\n", options.username );
+
+	cdmifs_capabilities();
 
 	curl_global_init( CURL_GLOBAL_ALL );
 
@@ -184,4 +190,73 @@ static int cdmifs_opt_proc( void *data, const char *arg, int key, struct fuse_ar
 	}
 }
 
+static void cdmifs_capabilities()
+{
+	json_t *capa;
+	options.gotmeta = 1;
+
+	capa = getcapabilities(NULL);
+	if( capa == NULL )
+	{
+		fprintf( stderr, "error: unable to fetch capabilities: %s\n", strerror(errno) );
+		exit(1);
+	}
+	if( !json_is_true( json_object_get(capa, "cdmi_size") ) )
+	{
+		fprintf( stderr, "error: server doesn't support: cdmi_size\n" );
+		exit(1);
+	}
+	json_decref(capa);
+
+	capa = getcapabilities("/container/");
+	if( capa == NULL )
+	{
+		fprintf( stderr, "error: unable to fetch capabilities: %s\n", strerror(errno) );
+		exit(1);
+	}
+	if( !json_is_true( json_object_get(capa, "cdmi_list_children") ) ||
+		!json_is_true( json_object_get(capa, "cdmi_list_children_range") ) ||
+		!json_is_true( json_object_get(capa, "cdmi_create_container") ) ||
+		!json_is_true( json_object_get(capa, "cdmi_delete_container") ) ||
+		!json_is_true( json_object_get(capa, "cdmi_read_metadata") ) ||
+		!json_is_true( json_object_get(capa, "cdmi_move_container") ) )
+	{
+		fprintf( stderr, "error: server doesn't fully support: containers\n" );
+		exit(1);
+	}
+	if( !json_is_true( json_object_get(capa, "cdmi_modify_metadata") ) )
+	{
+		options.gotmeta = 0;
+	}
+	json_decref(capa);
+
+
+	capa = getcapabilities("/dataobject/");
+	if( capa == NULL )
+	{
+		fprintf( stderr, "error: unable to fetch capabilities: %s\n", strerror(errno) );
+		exit(1);
+	}
+	if( !json_is_true( json_object_get(capa, "cdmi_read_value") ) ||
+		!json_is_true( json_object_get(capa, "cdmi_read_value_range") ) ||
+		!json_is_true( json_object_get(capa, "cdmi_modify_value") ) ||
+		!json_is_true( json_object_get(capa, "cdmi_modify_value_range") ) ||
+		!json_is_true( json_object_get(capa, "cdmi_read_metadata") ) ||
+		!json_is_true( json_object_get(capa, "cdmi_delete_dataobject") ) )
+	{
+		fprintf( stderr, "error: server doesn't fully support: dataobject\n" );
+		exit(1);
+	}
+	if( !json_is_true( json_object_get(capa, "cdmi_modify_metadata") ) )
+	{
+		options.gotmeta = 0;
+	}
+	json_decref(capa);
+
+	if( options.gotmeta != 1 )
+	{
+		fprintf( stderr, "warning: unable to store permissions\n" );
+	}
+
+}
 

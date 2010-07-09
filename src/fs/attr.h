@@ -12,6 +12,7 @@ extern int cdmifs_getattr(
 		struct stat *stbuf
 	);
 
+extern int cdmifs_chmod( const char *path, mode_t mode );
 extern int cdmifs_utimens( const char *path, const struct timespec tv[2] );
 
 #endif /* !ATTR_H */

@@ -9,6 +9,7 @@
 #include "../common.h"
 #include "../net.h"
 #include "../util.h"
+#include "attr.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -77,7 +78,9 @@ int cdmifs_create(
 		struct fuse_file_info *fi
 	)
 {
-	return cdmifs_common( path, mode, fi );
+	int ret = cdmifs_common( path, mode, fi );
+	cdmifs_chmod( path, mode );
+	return ret;
 }
 
 int cdmifs_release(

@@ -15,11 +15,13 @@
 
 
 
-#define CDMI_CONTAINER   (1<<1)
-#define CDMI_DATAOBJECT  (1<<2)
+#define CDMI_CONTAINER    (1<<1)
+#define CDMI_DATAOBJECT   (1<<2)
+#define CDMI_CAPABILITIES (1<<5)
 
 #define CDMI_SINGLE      (1<<3)
 #define CDMI_CHECK       (1<<4)
+#define CDMI_NORESOLVE   (1<<6)
 
 typedef enum _cdmi_request_type
 {
@@ -60,9 +62,12 @@ extern int cdmi_put( cdmi_request_t *request, const char *path );
 extern int cdmi_delete( cdmi_request_t *request, const char *path );
 extern void cdmi_free( cdmi_request_t *request );
 
+extern json_t *getcapabilities( const char *path );
 extern json_t *getmetadata( const char *path );
+extern int setmetadata( const char *path, json_t *metadata );
 
 extern char *path2url( const char *path );
+extern char *path2unresolved( const char *path );
 extern char *path2path( const char *path );
 extern int response_code2errno( long response_code );
 extern objectid_t objectid_decode( const char *b64data );

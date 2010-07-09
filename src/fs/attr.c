@@ -127,9 +127,30 @@ static int parse_metadata( json_t *metadata, struct stat *stbuf )
 			);
 	}
 
+	if( options.gotmeta && json_is_string( json_object_get(metadata, "cdmifs_mode") ) )
+	{
+		const char *modestr = json_string_value( json_object_get(metadata, "cdmifs_mode" ) );
+		sscanf( modestr, "%o", &(stbuf->st_mode) );
+	}
+
 	return 0;
 }
 
+int cdmifs_chmod( const char *path, mode_t mode )
+{
+	if( !options.gotmeta )
+		return -ENOSYS;
+	int ret;
+	char modestr[16];
+	sprintf( modestr, "0%o", mode );
+	json_t *meta = json_object();
+	json_object_set( meta, "cdmifs_mode", json_string(modestr) );
+	ret = setmetadata( path, meta );
+	json_decref( meta );
+	if( ret != 1 )
+		return errno;
+	return 0;
+}
 
 int cdmifs_utimens( const char *path, const struct timespec tv[2] )
 {

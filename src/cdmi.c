@@ -70,6 +70,15 @@ int cdmi_get( cdmi_request_t *request, const char *path )
 			cdmitype = CDMI_DATAOBJECT;
 		}
 	}
+	else if( ISSET(flags, CDMI_CAPABILITIES) )
+	{
+		assert( request->cdmi == 1 );
+		if( cdmitype != CDMI_CAPABILITIES )
+		{
+			headers = slist_replace( headers, "Accept: %s", mime[M_CAPABILITIES] );
+			cdmitype = CDMI_CAPABILITIES;
+		}
+	}
 	else if( cdmitype != 0 )
 	{
 		headers = slist_replace( headers, "Accept: %s", mime[M_OBJECT] );
@@ -94,7 +103,11 @@ int cdmi_get( cdmi_request_t *request, const char *path )
 	/* Build the url from the path and append the field
 	 * to it.
 	 */
-	url = path2url( path );
+	if( ISSET(flags, CDMI_NORESOLVE) )
+		url = path2unresolved( path );
+	else
+		url = path2url( path );
+
 	urlsize = strlen( url ) + 1;
 	if( request->fields != NULL )
 		for( cpp = request->fields, cp = *cpp; *cpp; cpp++, cp = *cpp )
@@ -116,7 +129,6 @@ int cdmi_get( cdmi_request_t *request, const char *path )
 		}
 	}
 
-
 	/* Set url to the curl object, download the data and
 	 * do error checks.
 	 */
@@ -128,7 +140,7 @@ int cdmi_get( cdmi_request_t *request, const char *path )
 	request->rawdata = download( curl );
 	if( !request->rawdata )
 		return -1;
-	/*puts( data );
+	/*puts( request->rawdata );
 	 */
 
 	errno = 0;
@@ -142,7 +154,7 @@ int cdmi_get( cdmi_request_t *request, const char *path )
 
 	res = curl_easy_getinfo( curl, CURLINFO_CONTENT_TYPE, &(request->contenttype) );
 	if( res != CURLE_OK || request->contenttype == NULL )
-		return -1;
+		return rerrno( EPROTO );
 	if( request->cdmi )
 	{
 		if( cdmitype == CDMI_CONTAINER && strcmp( request->contenttype, mime[M_CONTAINER] ) != 0 )
@@ -243,7 +255,7 @@ int cdmi_put( cdmi_request_t *request, const char *path )
 	}
 
 #ifndef NDEBUG
-	if( request->type != MOVE )
+	if( request->root == NULL && request->type != MOVE )
 	{
 		assert( ISSET(flags, CDMI_CONTAINER) || ISSET(flags, CDMI_DATAOBJECT) );
 		assert( request->cdmi == 0 ); /* only supported */
@@ -293,7 +305,15 @@ int cdmi_put( cdmi_request_t *request, const char *path )
 				json_decref( root );
 				data = realloc( data, strlen(data)+2 );
 				strcat( data, "\n" );
-				puts( data );
+				headers = slist_replace( headers, "Expect:" );
+			}
+			else if( request->root != NULL )
+			{
+				data = json_dumps( request->root, JSON_INDENT(1) );
+				data = realloc( data, strlen(data)+2 );
+				strcat( data, "\n" );
+				/*puts( data );
+				 */
 				headers = slist_replace( headers, "Expect:" );
 			}
 		}
@@ -344,7 +364,15 @@ int cdmi_put( cdmi_request_t *request, const char *path )
 				json_decref( root );
 				data = realloc( data, strlen(data)+2 );
 				strcat( data, "\n" );
-				puts( data );
+				headers = slist_replace( headers, "Expect:" );
+			}
+			else if( request->root != NULL )
+			{
+				data = json_dumps( request->root, JSON_INDENT(1) );
+				data = realloc( data, strlen(data)+2 );
+				strcat( data, "\n" );
+				/*puts( data );
+				 */
 				headers = slist_replace( headers, "Expect:" );
 			}
 		}
@@ -435,6 +463,34 @@ void cdmi_free( cdmi_request_t *request )
 		json_decref( request->root );
 }
 
+
+json_t *getcapabilities( const char *path )
+{
+	int ret;
+	char url[512] = "/cdmi_capabilities/";
+	if( path != NULL )
+	{
+		if( path[0] == '/' )
+			path++;
+		strcat( url, path );
+	}
+	cdmi_request_t req;
+
+	req.type = GET;
+	req.cdmi = 1;
+	req.fields = (char*[]){ "capabilities", NULL };
+	req.flags = CDMI_CAPABILITIES | CDMI_SINGLE | CDMI_CHECK | CDMI_NORESOLVE;
+	ret = cdmi_get( &req, url );
+	if( ret == -1 || req.root == NULL )
+	{
+		return NULL;
+	}
+
+	json_t *capa = req.root;
+	json_incref( capa );
+	cdmi_free( &req );
+	return capa;
+}
 json_t *getmetadata( const char *path )
 {
 	int ret;
@@ -449,7 +505,26 @@ json_t *getmetadata( const char *path )
 	ret = cdmi_get( &request, path );
 	if( ret == -1 )
 		return NULL;
-	return request.root;
+	json_t *metadata = request.root;
+	json_incref( metadata );
+	cdmi_free( &request );
+	return metadata;
+}
+
+int setmetadata( const char *path, json_t *metadata )
+{
+	int ret;
+
+	cdmi_request_t req;
+	req.type = PUT;
+	req.flags = CDMI_DATAOBJECT;
+	req.cdmi = 1;
+	req.root = json_object();
+	json_object_set( req.root, "metadata", metadata );
+	ret = cdmi_put( &req, path );
+	cdmi_free( &req );
+
+	return ret;
 }
 
 char *path2url( const char *path )
@@ -461,6 +536,19 @@ char *path2url( const char *path )
 			options.ssl?"https":"http",
 			options.host, options.port,
 			options.root, path
+		);
+	return url;
+}
+
+char *path2unresolved( const char *path )
+{
+	static char url[URLSIZE+1];
+	if( path[0] == '/' )
+		path++;
+	snprintf( url, URLSIZE, "%s://%s:%s/%s",
+			options.ssl?"https":"http",
+			options.host, options.port,
+			path
 		);
 	return url;
 }
